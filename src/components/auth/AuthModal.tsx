@@ -1,6 +1,7 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import { X, Phone, ArrowRight, CheckCircle2, ChevronLeft, Shield, Zap } from 'lucide-react';
 import { useToast } from '../common/Toast';
+import { supabaseHelpers, hasSupabaseConfig } from '../../lib/supabase';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -35,6 +36,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
   }, [isOpen]);
 
   useEffect(() => {
+    const savedAuth = localStorage.getItem('bbr-user');
+    if (savedAuth) {
+      try {
+        const parsed = JSON.parse(savedAuth) as { name?: string; phone?: string };
+        if (parsed.name && parsed.phone) {
+          setName(parsed.name);
+          setPhone(parsed.phone);
+        }
+      } catch {
+        localStorage.removeItem('bbr-user');
+      }
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
@@ -55,20 +71,56 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
     }, 1000);
   };
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (phone.length < 10) { showToast('Please enter a valid 10-digit mobile number', 'error'); return; }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      const newOtp = generateOtp();
+
+    try {
+      if (hasSupabaseConfig) {
+        const result = await supabaseHelpers.signInWithOtp(`+91${phone}`);
+        const generatedOtp = result?.otpCode || generateOtp();
+        setOtpCode(generatedOtp);
+        setOtpExpiry(Date.now() + 90 * 1000);
+        setOtp(['', '', '', '']);
+        setStep('otp');
+        startResendTimer();
+        showToast(`OTP sent to +91 ${phone}. Use code: ${generatedOtp}`, 'info');
+        setTimeout(() => otpRefs.current[0]?.focus(), 100);
+        return;
+      }
+
+      const response = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send-otp', phone: `+91${phone}` })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Unable to send OTP');
+      }
+
+      const generatedOtp = data.otpCode || generateOtp();
+      setOtpCode(generatedOtp);
+      setOtpExpiry(Date.now() + 90 * 1000);
       setOtp(['', '', '', '']);
       setStep('otp');
       startResendTimer();
-      showToast(`OTP sent to +91 ${phone}. Use code: ${newOtp}`, 'info');
+      showToast(data.demo ? `OTP generated for +91 ${phone}: ${generatedOtp}` : `OTP sent to +91 ${phone}. Use code: ${generatedOtp}`, 'info');
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
-    }, 1200);
+    } catch (error) {
+      const fallbackOtp = generateOtp();
+      setOtpCode(fallbackOtp);
+      setOtpExpiry(Date.now() + 90 * 1000);
+      setOtp(['', '', '', '']);
+      setStep('otp');
+      startResendTimer();
+      showToast(error instanceof Error ? error.message : `OTP generated for +91 ${phone}: ${fallbackOtp}`, 'info');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleOtpChange = (index: number, value: string) => {
@@ -93,7 +145,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
     otpRefs.current[nextEmpty === -1 ? 3 : nextEmpty]?.focus();
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     const code = otp.join('');
     if (code.length < 4) { showToast('Please enter the full 4-digit OTP', 'error'); return; }
@@ -108,18 +160,47 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
     }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      if (code === otpCode) {
-        onLoginSuccess({ name: name || 'Rider', phone });
-        showToast(`Welcome, ${name || 'Rider'}! You are signed in`, 'success');
-        onClose();
-      } else {
-        showToast('Invalid OTP. Please check the code and try again.', 'error');
-        setOtp(['', '', '', '']);
-        otpRefs.current[0]?.focus();
+
+    try {
+      if (hasSupabaseConfig) {
+        const result = await supabaseHelpers.verifyOtp(`+91${phone}`, code);
+        if (!result.demo && result.data?.user) {
+          const userData = { name: name || 'Rider', phone };
+          await supabaseHelpers.upsertProfile(userData);
+          localStorage.setItem('bbr-user', JSON.stringify(userData));
+          onLoginSuccess(userData);
+          showToast(`Welcome, ${userData.name}! You are signed in`, 'success');
+          onClose();
+          return;
+        }
       }
-    }, 1000);
+
+      const response = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify-otp', phone: `+91${phone}`, otp: code, name: name || 'Rider' })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Invalid OTP. Please check the code and try again.');
+      }
+
+      const userData = { name: data.user?.name || name || 'Rider', phone };
+      if (hasSupabaseConfig) {
+        await supabaseHelpers.upsertProfile(userData);
+      }
+      localStorage.setItem('bbr-user', JSON.stringify(userData));
+      onLoginSuccess(userData);
+      showToast(`Welcome, ${userData.name}! You are signed in`, 'success');
+      onClose();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Invalid OTP. Please check the code and try again.', 'error');
+      setOtp(['', '', '', '']);
+      otpRefs.current[0]?.focus();
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!isOpen) return null;

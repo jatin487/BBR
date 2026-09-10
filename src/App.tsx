@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ToastProvider, useToast } from './components/common/Toast';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
@@ -52,7 +52,26 @@ const AppContent: React.FC = () => {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
+    const savedUser = localStorage.getItem('bbr-user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem('bbr-user');
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('bbr-user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('bbr-user');
+    }
+  }, [user]);
+
+  useEffect(() => {
     const handleScroll = () => {
       setShowBackToTop(window.scrollY > 400);
     };
@@ -104,6 +123,12 @@ const AppContent: React.FC = () => {
     rateType: RateType = 'fullday',
     duration: number = 1
   ) => {
+    if (!user) {
+      showToast('Please sign in to complete the booking.', 'info');
+      setIsAuthOpen(true);
+      return;
+    }
+
     setBookingVehicle(vehicle);
     setBookingRateType(rateType);
     setBookingDuration(duration);

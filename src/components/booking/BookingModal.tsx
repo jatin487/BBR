@@ -27,6 +27,7 @@ import { Vehicle, RateType, PromoOffer } from '../../types';
 import { LOCATIONS } from '../../data/locations';
 import { OFFERS } from '../../data/offers';
 import { useToast } from '../common/Toast';
+import { supabaseHelpers, hasSupabaseConfig } from '../../lib/supabase';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -86,7 +87,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   // Step 5: Billing & Promo
   const [promoCodeInput, setPromoCodeInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<PromoOffer | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'pay_at_pickup'>('upi');
+  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'pay_at_pickup'>('pay_at_pickup');
   const [bookingId, setBookingId] = useState('');
 
   if (!isOpen || !vehicle) return null;
@@ -126,12 +127,62 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     }
   };
 
-  const handleConfirmBooking = () => {
+  const handleConfirmBooking = async () => {
     const newId = `BBR-${Math.floor(100000 + Math.random() * 900000)}`;
-    setBookingId(newId);
+    const userFromStorage = JSON.parse(localStorage.getItem('bbr-user') || 'null');
+    const bookingRecord = {
+      id: newId,
+      userId: userFromStorage?.phone || `guest-${Date.now()}`,
+      vehicleId: vehicle.id,
+      vehicleName: vehicle.name,
+      city,
+      pickupHub,
+      dropHub,
+      pickupDate,
+      pickupTime,
+      returnDate,
+      returnTime,
+      rateType,
+      duration,
+      totalAmount: totalAmountToPay,
+      customerName,
+      customerPhone,
+      paymentMethod,
+      createdAt: new Date().toISOString(),
+      status: 'confirmed'
+    };
+
+    try {
+      if (hasSupabaseConfig) {
+        const saved = await supabaseHelpers.createBooking(bookingRecord);
+        setBookingId(saved.id || newId);
+      } else {
+        const response = await fetch('/api/bookings/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...bookingRecord, userId: bookingRecord.userId.replace(/^\+91/, '') })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || 'Unable to create booking');
+        }
+
+        const savedBookings = JSON.parse(localStorage.getItem('bbr-bookings') || '[]');
+        savedBookings.push({ ...bookingRecord, id: data.booking?.id || newId });
+        localStorage.setItem('bbr-bookings', JSON.stringify(savedBookings));
+        setBookingId(data.booking?.id || newId);
+      }
+    } catch (error) {
+      const savedBookings = JSON.parse(localStorage.getItem('bbr-bookings') || '[]');
+      savedBookings.push(bookingRecord);
+      localStorage.setItem('bbr-bookings', JSON.stringify(savedBookings));
+      setBookingId(newId);
+      showToast(error instanceof Error ? error.message : 'Saved locally and ready for sync', 'info');
+    }
+
     setCurrentStep(6);
 
-    // Trigger celebratory confetti
     confetti({
       particleCount: 120,
       spread: 70,
@@ -646,33 +697,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-3">
                   Payment Mode
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div
-                    onClick={() => setPaymentMethod('upi')}
-                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
-                      paymentMethod === 'upi'
-                        ? 'bg-orange-500/15 border-orange-500 text-white'
-                        : 'bg-slate-900/50 border-white/5 text-slate-400'
-                    }`}
-                  >
-                    <QrCode className="w-5 h-5 text-orange-400 mb-1" />
-                    <div className="text-xs font-bold">Instant UPI / QR</div>
-                    <div className="text-[10px] text-slate-400">GPay, PhonePe, Paytm</div>
-                  </div>
-
-                  <div
-                    onClick={() => setPaymentMethod('card')}
-                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
-                      paymentMethod === 'card'
-                        ? 'bg-orange-500/15 border-orange-500 text-white'
-                        : 'bg-slate-900/50 border-white/5 text-slate-400'
-                    }`}
-                  >
-                    <CreditCard className="w-5 h-5 text-blue-400 mb-1" />
-                    <div className="text-xs font-bold">Credit / Debit Card</div>
-                    <div className="text-[10px] text-slate-400">Visa, Mastercard, RuPay</div>
-                  </div>
-
+                <div className="grid grid-cols-1 gap-3">
                   <div
                     onClick={() => setPaymentMethod('pay_at_pickup')}
                     className={`p-4 rounded-2xl border cursor-pointer transition-all ${
@@ -683,7 +708,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   >
                     <ShieldCheck className="w-5 h-5 text-emerald-400 mb-1" />
                     <div className="text-xs font-bold">Pay at Hub Pickup</div>
-                    <div className="text-[10px] text-slate-400">Zero Advance Required</div>
+                    <div className="text-[10px] text-slate-400">Free booking • Zero advance required</div>
                   </div>
                 </div>
               </div>
@@ -796,7 +821,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               className="px-7 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 flex items-center gap-1.5 hover:scale-105 transition-all"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Confirm & Pay ₹{totalAmountToPay}</span>
+              <span>Confirm Booking</span>
             </button>
           )}
 
