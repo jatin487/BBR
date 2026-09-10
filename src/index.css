@@ -1,0 +1,288 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: 'Manrope', system-ui, -apple-system, sans-serif;
+    --font-heading: 'Manrope', sans-serif;
+    --font-mono: 'Space Grotesk', monospace;
+
+    /* === PREMIUM ORANGE & BLACK PALETTE === */
+    --bg-primary:    #0A0A0A;
+    --bg-secondary:  #111111;
+    --surface:       #1A1A1A;
+    --surface-el:    #222222;
+    --text-primary:  #F4F5F2;
+    --text-secondary:#9BA1A5;
+    --text-muted:    #656C70;
+    --border:        #2A2A2A;
+    --accent:        #FF6A00;
+    --accent-hover:  #FF8C33;
+    --accent-dark:   #CC5500;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background: #FF6A00;
+    color: #fff;
+  }
+}
+
+/* =====================================================
+   SURFACE UTILITIES
+   ===================================================== */
+.glass-panel {
+  background: rgba(20, 20, 20, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 106, 0, 0.08);
+}
+
+.glass-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 106, 0, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 106, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.glass-nav {
+  background: rgba(10, 10, 10, 0.6);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border-bottom: 1px solid rgba(255, 106, 0, 0.12);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 106, 0, 0.06);
+}
+
+/* =====================================================
+   TYPOGRAPHY UTILITIES
+   ===================================================== */
+.gradient-text-orange {
+  background: linear-gradient(135deg, #FF6A00 0%, #CC5500 60%, #FF8C33 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-gold {
+  background: linear-gradient(135deg, #FF8C33 0%, #FF6A00 50%, #CC5500 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-border-orange {
+  border-image: linear-gradient(to right, #FF6A00, #CC5500) 1;
+}
+
+/* =====================================================
+   GLOW EFFECTS (Lime accent)
+   ===================================================== */
+.glow-orange {
+  box-shadow: 0 0 20px rgba(255, 106, 0, 0.2);
+}
+
+.glow-orange-sm {
+  box-shadow: 0 0 12px rgba(255, 106, 0, 0.15);
+}
+
+.glow-orange-lg {
+  box-shadow: 0 0 40px rgba(255, 106, 0, 0.25);
+}
+
+/* =====================================================
+   PREMIUM SCROLLBAR
+   ===================================================== */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #333333 var(--bg-primary);
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--bg-primary) !important;
+}
+
+::-webkit-scrollbar:horizontal {
+  display: none !important;
+  height: 0 !important;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 0px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FF6A00 !important;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: #FF8C33 !important;
+}
+
+/* =====================================================
+   NO-SCROLLBAR UTILITY
+   ===================================================== */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* =====================================================
+   BACKGROUND ACCENTS
+   ===================================================== */
+.bg-radial-gradient {
+  background: radial-gradient(circle at 50% 0%, rgba(255, 106, 0, 0.06) 0%, transparent 60%);
+}
+
+.bg-radial-accent {
+  background:
+    radial-gradient(circle at 80% 20%, rgba(255, 106, 0, 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 10% 80%, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
+}
+
+/* =====================================================
+   PREMIUM BUTTON BASE CLASSES
+   ===================================================== */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--accent);
+  color: #080A0B;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: 9999px;
+  padding: 10px 24px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(184, 255, 44, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  border-radius: 9999px;
+  padding: 10px 24px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* =====================================================
+   FORM INPUTS
+   ===================================================== */
+.input-premium {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-primary);
+  padding: 10px 14px;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  outline: none;
+}
+
+.input-premium::placeholder {
+  color: var(--text-muted);
+}
+
+.input-premium:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(255, 106, 0, 0.15);
+}
+
+/* =====================================================
+   TECH LABEL STYLE
+   ===================================================== */
+.label-tech {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* =====================================================
+   SECTION DIVIDER
+   ===================================================== */
+.section-divider {
+  border: none;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--border), transparent);
+}
