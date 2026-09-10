@@ -10,7 +10,6 @@ import {
   FileText,
   ChevronDown,
   Sparkles,
-  Star,
   Clock
 } from 'lucide-react';
 import { LOCATIONS } from '../../data/locations';
@@ -64,13 +63,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between font-medium">
           <div className="flex items-center gap-5">
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold"
-              style={{ color: '#FF6A00', backgroundColor: 'rgba(255,106,0,0.08)' }}
-            >
-              <Star className="w-3.5 h-3.5" style={{ fill: '#FF6A00', color: '#FF6A00' }} />
-              <span>4.8 ★ (17 Google Reviews)</span>
-            </div>
             <div className="flex items-center gap-1" style={{ color: '#9BA1A5' }}>
               <MapPin className="w-3.5 h-3.5" style={{ color: '#656C70' }} />
               <span>Bhauwala, Dehradun, Uttarakhand 248007</span>
@@ -316,18 +308,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               WebkitBackdropFilter: 'blur(20px)'
             }}
           >
-            {/* Rating badge */}
-            <div
-              className="p-3 rounded-xl flex items-center justify-between text-xs"
-              style={{ backgroundColor: '#1A1A1A', border: '1px solid #2A2A2A' }}
-            >
-              <div className="flex items-center gap-1.5 font-bold" style={{ color: '#FF6A00' }}>
-                <Star className="w-4 h-4" style={{ fill: '#FF6A00', color: '#FF6A00' }} />
-                <span>4.8 ★ (17 Google Reviews)</span>
-              </div>
-              <span className="text-[11px] font-bold" style={{ color: '#FF6A00' }}>Open · Closes 9 PM</span>
-            </div>
-
             {/* Location picker */}
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: '#656C70' }}>

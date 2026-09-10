@@ -82,31 +82,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         {/* ── TOP ZONE ── */}
         <div className="flex flex-col items-center pt-2 sm:pt-4 max-w-5xl">
 
-          {/* Google Business pill badge */}
-          <motion.div
-            initial={{ opacity: 0, y: -15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="inline-flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider mb-6 backdrop-blur-xl"
-            style={{
-              background: 'rgba(26,26,26,0.75)',
-              border: '1px solid rgba(255,106,0,0.2)',
-              boxShadow: '0 0 24px rgba(255,106,0,0.08)'
-            }}
-          >
-            <div className="flex items-center gap-1.5 font-bold" style={{ color: '#FF6A00' }}>
-              <Star className="w-3.5 h-3.5" style={{ fill: '#FF6A00', color: '#FF6A00' }} />
-              <span>4.8 ★ (17 Google Reviews)</span>
-            </div>
-            <span className="w-1 h-1 rounded-full hidden sm:inline" style={{ backgroundColor: '#2A2A2A' }} />
-            <div className="flex items-center gap-1" style={{ color: '#9BA1A5' }}>
-              <MapPin className="w-3.5 h-3.5" style={{ color: '#FF6A00' }} />
-              <span>Bhauwala, Dehradun 248007</span>
-            </div>
-            <span className="w-1 h-1 rounded-full hidden sm:inline" style={{ backgroundColor: '#2A2A2A' }} />
-            <span className="font-bold" style={{ color: '#FF6A00' }}>Open · Closes 9 PM</span>
-          </motion.div>
-
           {/* Main Heading */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}

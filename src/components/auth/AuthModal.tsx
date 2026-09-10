@@ -16,6 +16,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
   const [otp, setOtp] = useState(['', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpExpiry, setOtpExpiry] = useState<number | null>(null);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -25,6 +27,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
       setPhone('');
       setName('');
       setOtp(['', '', '', '']);
+      setOtpCode('');
+      setOtpExpiry(null);
       setIsLoading(false);
       setResendTimer(0);
     }
@@ -33,6 +37,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
   useEffect(() => {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
+
+  const generateOtp = () => {
+    const newOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    setOtpCode(newOtp);
+    setOtpExpiry(Date.now() + 90 * 1000);
+    return newOtp;
+  };
 
   const startResendTimer = () => {
     setResendTimer(30);
@@ -47,12 +58,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
   const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
     if (phone.length < 10) { showToast('Please enter a valid 10-digit mobile number', 'error'); return; }
+
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
+      const newOtp = generateOtp();
+      setOtp(['', '', '', '']);
       setStep('otp');
       startResendTimer();
-      showToast(`OTP sent to +91 ${phone}! (Demo: 4582)`, 'info');
+      showToast(`OTP sent to +91 ${phone}. Use code: ${newOtp}`, 'info');
       setTimeout(() => otpRefs.current[0]?.focus(), 100);
     }, 1200);
   };
@@ -83,15 +97,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
     e.preventDefault();
     const code = otp.join('');
     if (code.length < 4) { showToast('Please enter the full 4-digit OTP', 'error'); return; }
+
+    if (!otpCode || !otpExpiry || Date.now() > otpExpiry) {
+      showToast('OTP expired. Please request a new code.', 'error');
+      setOtp(['', '', '', '']);
+      setOtpCode('');
+      setOtpExpiry(null);
+      setStep('phone');
+      return;
+    }
+
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      if (code === '4582' || code.length === 4) {
+      if (code === otpCode) {
         onLoginSuccess({ name: name || 'Rider', phone });
         showToast(`Welcome, ${name || 'Rider'}! You are signed in`, 'success');
         onClose();
       } else {
-        showToast('Invalid OTP. Hint: 4582', 'error');
+        showToast('Invalid OTP. Please check the code and try again.', 'error');
         setOtp(['', '', '', '']);
         otpRefs.current[0]?.focus();
       }
@@ -364,16 +388,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
                       />
                     ))}
                   </div>
-                  <p style={{ textAlign: 'center', fontSize: 12, color: TEXT_MUTED }}>
-                    Demo OTP:{' '}
-                    <button
-                      type="button"
-                      onClick={() => { setOtp(['4','5','8','2']); setTimeout(() => otpRefs.current[3]?.focus(), 0); }}
-                      style={{ color: ACCENT_GLOW, fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontFamily: 'monospace', letterSpacing: '0.08em' }}
-                    >
-                      4582
-                    </button>
-                  </p>
+                  {otpExpiry && (
+                    <p style={{ textAlign: 'center', fontSize: 12, color: TEXT_MUTED }}>
+                      Expires in{' '}
+                      <span style={{ color: ACCENT_GLOW, fontWeight: 700, fontFamily: 'monospace' }}>
+                        {Math.max(0, Math.ceil((otpExpiry - Date.now()) / 1000))}s
+                      </span>
+                    </p>
+                  )}
                 </div>
 
                 {/* Verify CTA */}
@@ -424,7 +446,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
                   ) : (
                     <button
                       type="button"
-                      onClick={() => { startResendTimer(); showToast(`OTP resent to +91 ${phone}!`, 'info'); }}
+                      onClick={() => {
+                        const newOtp = generateOtp();
+                        setOtp(['', '', '', '']);
+                        startResendTimer();
+                        showToast(`New OTP sent to +91 ${phone}. Use code: ${newOtp}`, 'info');
+                        setTimeout(() => otpRefs.current[0]?.focus(), 100);
+                      }}
                       style={{ background: 'none', border: 'none', color: ACCENT_GLOW, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Manrope, system-ui, sans-serif' }}
                     >
                       Resend OTP
