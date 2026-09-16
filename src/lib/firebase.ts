@@ -1,4 +1,5 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { getAnalytics, isSupported } from 'firebase/analytics';
 import {
   getAuth,
   Auth,
@@ -37,14 +38,15 @@ export interface UserProfile {
   kyc?: VerifiedKycData | null;
 }
 
-// ── Firebase Config ──────────────────────────────────────────────────────────
+// ── Firebase Config (Official App: login-9f3fd) ──────────────────────────────
 const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || '',
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        || '',
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         || '',
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     || '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID|| '',
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID             || ''
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || 'AIzaSyDbterQhAJSJCUaiJt033ytsQDLns2Zl-Y',
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        || 'login-9f3fd.firebaseapp.com',
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         || 'login-9f3fd',
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     || 'login-9f3fd.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID|| '738858214140',
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID             || '1:738858214140:web:525e35e1bb346c35d1ed79',
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID     || 'G-KDEWP405R4'
 };
 
 export const hasFirebaseConfig = Boolean(
@@ -61,6 +63,15 @@ if (hasFirebaseConfig) {
   try {
     app  = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     auth = getAuth(app);
+    if (typeof window !== 'undefined') {
+      isSupported()
+        .then((supported) => {
+          if (supported && app) {
+            getAnalytics(app);
+          }
+        })
+        .catch(() => {});
+    }
   } catch (error) {
     console.warn('[Firebase] Initialization error:', error);
     app  = null;
