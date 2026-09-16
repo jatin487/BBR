@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'bbr_backend_data';
 
-let inMemoryData: { users: StoredUser[]; bookings: StoredBooking[] } = { users: [], bookings: [] };
+let inMemoryData: StoredData = { users: [], bookings: [], kycRecords: {} };
 
 export type StoredUser = {
   id: string;
@@ -31,9 +31,24 @@ export type StoredBooking = {
   status: string;
 };
 
+export type BackendKycRecord = {
+  status: 'verified' | 'pending' | 'rejected';
+  uid: string;
+  dlNumber: string;
+  holderName: string;
+  dob?: string;
+  validTill?: string;
+  vehicleClasses?: string[];
+  digilockerDocId?: string;
+  verificationTimestamp?: string;
+  securityHash?: string;
+  verifiedAt?: string;
+};
+
 export type StoredData = {
   users: StoredUser[];
   bookings: StoredBooking[];
+  kycRecords?: Record<string, BackendKycRecord>;
 };
 
 const readData = (): StoredData => {
@@ -47,7 +62,8 @@ const readData = (): StoredData => {
       const parsed = JSON.parse(raw) as StoredData;
       inMemoryData = {
         users: Array.isArray(parsed.users) ? parsed.users : [],
-        bookings: Array.isArray(parsed.bookings) ? parsed.bookings : []
+        bookings: Array.isArray(parsed.bookings) ? parsed.bookings : [],
+        kycRecords: parsed.kycRecords || {}
       };
       return inMemoryData;
     } catch {
@@ -55,6 +71,9 @@ const readData = (): StoredData => {
     }
   }
 
+  if (!inMemoryData.kycRecords) {
+    inMemoryData.kycRecords = {};
+  }
   return inMemoryData;
 };
 
@@ -70,8 +89,10 @@ export const getBookings = () => readData().bookings;
 
 export const saveUser = (user: StoredUser) => {
   const data = readData();
-  const existing = data.users.find((entry) => entry.phone === user.phone);
-  const nextUsers = existing ? data.users.map((entry) => (entry.phone === user.phone ? user : entry)) : [...data.users, user];
+  const existing = data.users.find((entry) => entry.phone === user.phone || entry.id === user.id);
+  const nextUsers = existing
+    ? data.users.map((entry) => (entry.phone === user.phone || entry.id === user.id ? user : entry))
+    : [...data.users, user];
   const next = { ...data, users: nextUsers };
   writeData(next);
   return user;
@@ -88,6 +109,34 @@ export const getUserByPhone = (phone: string) => {
   return getUsers().find((user) => user.phone === phone);
 };
 
-export const clearData = () => {
-  writeData({ users: [], bookings: [] });
+export const getUserByUid = (uid: string) => {
+  return getUsers().find((user) => user.id === uid);
 };
+
+export const getUserKyc = (uid: string): BackendKycRecord | null => {
+  if (!uid) return null;
+  const data = readData();
+  return data.kycRecords?.[uid] || null;
+};
+
+export const saveUserKyc = (uid: string, kyc: BackendKycRecord): BackendKycRecord => {
+  if (!uid) throw new Error('UID is required to save KYC');
+  const data = readData();
+  const kycRecords = { ...(data.kycRecords || {}), [uid]: { ...kyc, uid } };
+  writeData({ ...data, kycRecords });
+  return kycRecords[uid];
+};
+
+export const deleteUserKyc = (uid: string): boolean => {
+  if (!uid) return false;
+  const data = readData();
+  if (!data.kycRecords?.[uid]) return false;
+  const { [uid]: _, ...rest } = data.kycRecords;
+  writeData({ ...data, kycRecords: rest });
+  return true;
+};
+
+export const clearData = () => {
+  writeData({ users: [], bookings: [], kycRecords: {} });
+};
+

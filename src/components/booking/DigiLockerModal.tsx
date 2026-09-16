@@ -1,12 +1,14 @@
 import React from 'react';
 import { X, ShieldCheck, Award } from 'lucide-react';
-import { DigiLockerRequester, VerifiedKycData } from './DigiLockerRequester';
+import { KycCard } from '../kyc/KycCard';
+import { UserProfile, VerifiedKycData, loadUserSession } from '../../lib/firebase';
 
 interface DigiLockerModalProps {
   isOpen: boolean;
   onClose: () => void;
   riderName: string;
   riderPhone: string;
+  user?: UserProfile | null;
   onVerificationSuccess?: (data: VerifiedKycData) => void;
 }
 
@@ -15,9 +17,18 @@ export const DigiLockerModal: React.FC<DigiLockerModalProps> = ({
   onClose,
   riderName,
   riderPhone,
+  user,
   onVerificationSuccess
 }) => {
   if (!isOpen) return null;
+
+  const activeUser = user || loadUserSession() || {
+    uid: `guest-${(riderPhone || '').replace(/\D/g, '') || Date.now().toString(36)}`,
+    name: riderName || 'Rider',
+    phone: riderPhone || '',
+    authProvider: 'phone' as const,
+    kyc: null
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
@@ -52,13 +63,13 @@ export const DigiLockerModal: React.FC<DigiLockerModalProps> = ({
           </button>
         </div>
 
-        {/* Content */}
-        <DigiLockerRequester
-          riderName={riderName}
-          riderPhone={riderPhone}
-          standalone={true}
-          onVerificationComplete={(data) => {
-            if (onVerificationSuccess) onVerificationSuccess(data);
+        {/* KycCard */}
+        <KycCard
+          user={activeUser}
+          onKycUpdated={(kycData) => {
+            if (kycData && onVerificationSuccess) {
+              onVerificationSuccess(kycData);
+            }
           }}
         />
 
@@ -67,7 +78,7 @@ export const DigiLockerModal: React.FC<DigiLockerModalProps> = ({
           <div className="flex items-center gap-2">
             <Award className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>
-              Verified documents remain securely linked to your account for all future FREEDO rentals.
+              Verified documents remain securely linked to your account for all future BBR rentals.
             </span>
           </div>
 
@@ -83,3 +94,4 @@ export const DigiLockerModal: React.FC<DigiLockerModalProps> = ({
     </div>
   );
 };
+

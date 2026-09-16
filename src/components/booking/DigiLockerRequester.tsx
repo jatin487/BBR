@@ -59,10 +59,10 @@ export const DigiLockerRequester: React.FC<DigiLockerRequesterProps> = ({
   const [consentGranted, setConsentGranted] = useState(true);
   const [showQrModal, setShowQrModal] = useState(false);
 
-  // Manual fallback state
+  // Manual fallback state — start empty, user fills in their own details
   const [activeTab, setActiveTab] = useState<'digilocker' | 'manual'>('digilocker');
-  const [manualDl, setManualDl] = useState('UK-0720210087452');
-  const [manualAadhaar, setManualAadhaar] = useState('7845 9012 4432');
+  const [manualDl, setManualDl] = useState('');
+  const [manualAadhaar, setManualAadhaar] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export const DigiLockerRequester: React.FC<DigiLockerRequesterProps> = ({
       status: 'verified',
       dlNumber,
       aadhaarNumber: maskedAadhaar,
-      holderName: riderName || 'Rohan Sharma',
+      holderName: riderName && riderName.trim() ? riderName.trim() : 'Verified Rider',
       dob: '15-Aug-1996',
       validTill: '14-Sep-2041',
       vehicleClasses: ['MCWG (Motorcycle with Gear)', 'LMV (Light Motor Vehicle)'],

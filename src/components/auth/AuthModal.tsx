@@ -162,31 +162,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     showToast(`SMS Verification Code sent to +91 ${recipientPhone}`, 'success');
   };
 
-  // Google 1-Click Sign-In with Firebase
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
       const userProfile = await firebaseAuthService.signInWithGoogle();
-      const resolvedName = userProfile.name || 'Google Rider';
-      const resolvedPhone = userProfile.phone || '+91 98765 43210';
 
-      // Sync with Supabase if active
-      if (hasSupabaseConfig) {
-        await supabaseHelpers
-          .upsertProfile({ name: resolvedName, phone: resolvedPhone })
-          .catch(() => {});
-      }
-
-      showToast(`Welcome, ${resolvedName}! Signed in via Firebase Google Auth`, 'success');
+      showToast(`Welcome, ${userProfile.name}! Signed in via Google`, 'success');
       onLoginSuccess({
-        name: resolvedName,
-        phone: resolvedPhone,
+        name:  userProfile.name,
+        phone: userProfile.phone,
         email: userProfile.email
       });
       onClose();
     } catch (error) {
       console.error('Google sign-in error:', error);
-      showToast('Google Sign-In could not be completed. Please try mobile login.', 'error');
+      const msg = error instanceof Error ? error.message : 'Google Sign-In failed.';
+      // Show the full message so the user understands what they need to do
+      showToast(msg, 'error');
     } finally {
       setIsGoogleLoading(false);
     }
@@ -465,7 +457,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         type="text"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. Rohan Sharma"
+                        placeholder="e.g. Your Full Name"
                         className="w-full bg-slate-950 border border-white/10 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 transition-colors"
                       />
                     </div>

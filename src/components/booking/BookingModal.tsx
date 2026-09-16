@@ -9,7 +9,8 @@ import {
   Sparkles,
   Download,
   Share2,
-  Check
+  Check,
+  AlertCircle
 } from 'lucide-react';
 import { Vehicle, RateType, PromoOffer } from '../../types';
 import { LOCATIONS } from '../../data/locations';
@@ -18,6 +19,7 @@ import { useToast } from '../common/Toast';
 import { supabaseHelpers, hasSupabaseConfig } from '../../lib/supabase';
 import { DigiLockerRequester, VerifiedKycData } from './DigiLockerRequester';
 import { loadUserSession, loadUserKyc, saveUserKyc } from '../../lib/firebase';
+import { KycCard } from '../kyc/KycCard';
 
 
 interface BookingModalProps {
@@ -66,24 +68,20 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   // Step 3: Customer Details & Firebase Session
   const userProfile = loadUserSession();
-  const initialStoredKyc = userProfile?.kyc || loadUserKyc();
-  const [customerName, setCustomerName] = useState(userProfile?.name || 'Rohan Sharma');
+  const initialStoredKyc = userProfile?.kyc || loadUserKyc(userProfile?.uid);
+  const [customerName, setCustomerName] = useState(userProfile?.name || '');
   const [customerPhone, setCustomerPhone] = useState(
     userProfile?.phone
       ? String(userProfile.phone).replace(/^\+91/, '').replace(/\s+/g, '')
-      : '9876543210'
+      : ''
   );
-  const [customerEmail, setCustomerEmail] = useState(
-    userProfile?.email || 'rohan.rider@gmail.com'
-  );
-  const [emergencyPhone, setEmergencyPhone] = useState('9811223344');
+  const [customerEmail, setCustomerEmail] = useState(userProfile?.email || '');
+  const [emergencyPhone, setEmergencyPhone] = useState('');
 
   // Step 4: DigiLocker KYC Verification
   const [verifiedKyc, setVerifiedKyc] = useState<VerifiedKycData | null>(initialStoredKyc);
-  const [dlNumber, setDlNumber] = useState(initialStoredKyc?.dlNumber || 'UK-0720230048192');
-  const [aadhaarNumber, setAadhaarNumber] = useState(
-    initialStoredKyc?.aadhaarNumber || '7845 9012 4432'
-  );
+  const [dlNumber, setDlNumber] = useState(initialStoredKyc?.dlNumber || '');
+  const [aadhaarNumber, setAadhaarNumber] = useState(initialStoredKyc?.aadhaarNumber || '');
 
   useEffect(() => {
     if (isOpen) {
@@ -93,16 +91,23 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       if (initialCity) setCity(initialCity);
 
       const activeSession = loadUserSession();
-      const activeKyc = activeSession?.kyc || loadUserKyc();
-      if (activeSession?.name) setCustomerName(activeSession.name);
-      if (activeSession?.phone) {
-        setCustomerPhone(activeSession.phone.replace(/^\+91/, '').replace(/\s+/g, ''));
-      }
-      if (activeSession?.email) setCustomerEmail(activeSession.email);
+      const activeKyc = activeSession?.kyc || loadUserKyc(activeSession?.uid);
+      // Always use real session data — never fall back to a hardcoded name
+      setCustomerName(activeSession?.name || '');
+      setCustomerPhone(
+        activeSession?.phone
+          ? activeSession.phone.replace(/^\+91/, '').replace(/\s+/g, '')
+          : ''
+      );
+      setCustomerEmail(activeSession?.email || '');
       if (activeKyc) {
         setVerifiedKyc(activeKyc);
         setDlNumber(activeKyc.dlNumber);
         setAadhaarNumber(activeKyc.aadhaarNumber);
+      } else {
+        setVerifiedKyc(null);
+        setDlNumber('');
+        setAadhaarNumber('');
       }
     }
   }, [isOpen, initialRateType, initialDuration, initialCity]);
@@ -613,17 +618,65 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           {/* STEP 4: DIGILOCKER DOCUMENT VERIFICATION */}
           {currentStep === 4 && (
             <div className="space-y-4">
-              <DigiLockerRequester
-                riderName={customerName}
-                riderPhone={customerPhone}
-                initialVerifiedData={verifiedKyc}
-                onVerificationComplete={(data) => {
-                  setVerifiedKyc(data);
-                  setDlNumber(data.dlNumber);
-                  setAadhaarNumber(data.aadhaarNumber);
-                  saveUserKyc(data);
+              <KycCard
+                user={
+                  userProfile
+                    ? { ...userProfile, kyc: verifiedKyc }
+                    : {
+                        uid: `guest-${customerPhone || Date.now().toString(36)}`,
+                        name: customerName || 'Rider',
+                        phone: customerPhone,
+                        email: customerEmail,
+                        authProvider: 'phone',
+                        kyc: verifiedKyc
+                      }
+                }
+                onKycUpdated={(kycData) => {
+                  setVerifiedKyc(kycData);
+                  if (kycData) {
+                    setDlNumber(kycData.dlNumber);
+                    setAadhaarNumber(kycData.aadhaarNumber);
+                    if (userProfile?.uid) {
+                      saveUserKyc(kycData, userProfile.uid);
+                    }
+                  } else {
+                    setDlNumber('');
+                    setAadhaarNumber('');
+                  }
                 }}
               />
+
+              {verifiedKyc ? (
+                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <div>
+                      <h4 className="text-xs font-bold text-white">✓ KYC Verified</h4>
+                      <p className="text-[11px] text-slate-300">
+                        Driving Licence {verifiedKyc.dlNumber} verified via DigiLocker. Ready to proceed to payment!
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(5)}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-wider shrink-0 transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/20"
+                  >
+                    <span>✓ KYC Verified Continue Booking</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
+                    <AlertCircle className="w-4 h-4 text-amber-400" />
+                    <span>KYC Verification Required</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Please verify your Driving Licence before completing your rental. Click <strong>Connect DigiLocker</strong> above to authenticate your license in seconds.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -764,7 +817,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <div className="col-span-2 pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>DigiLocker Verified (DL: {dlNumber || 'UK-0720230048192'} • UID: {aadhaarNumber})</span>
+                      <span>DigiLocker Verified (DL: {dlNumber} • UID: {aadhaarNumber})</span>
                     </div>
                     {verifiedKyc?.digilockerDocId && (
                       <span className="text-[10px] font-mono text-slate-400">
@@ -818,14 +871,20 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             <button
               onClick={() => {
                 if (currentStep === 4 && !verifiedKyc) {
-                  showToast('Please complete DigiLocker document verification before proceeding', 'error');
+                  showToast('KYC Verification Required: Please verify your Driving Licence before completing your rental.', 'error');
                   return;
                 }
                 setCurrentStep(currentStep + 1);
               }}
               className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-orange-500/20 flex items-center gap-1.5 hover:scale-105 transition-all"
             >
-              <span>{currentStep === 4 && !verifiedKyc ? 'Verify with DigiLocker' : 'Continue'}</span>
+              <span>
+                {currentStep === 4 && verifiedKyc
+                  ? '✓ KYC Verified Continue Booking'
+                  : currentStep === 4
+                  ? 'KYC Verification Required'
+                  : 'Continue'}
+              </span>
               <ChevronRight className="w-4 h-4" />
             </button>
           )}

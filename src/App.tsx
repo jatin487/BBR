@@ -19,11 +19,13 @@ import { VehicleDetailsModal } from './components/vehicles/VehicleDetailsModal';
 import { BookingModal } from './components/booking/BookingModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { DigiLockerModal } from './components/booking/DigiLockerModal';
+import { UserProfileBanner } from './components/auth/UserProfileBanner';
 import {
   firebaseAuthService,
   loadUserSession,
   saveUserSession,
   clearUserSession,
+  saveUserKyc,
   UserProfile,
   VerifiedKycData
 } from './lib/firebase';
@@ -68,19 +70,23 @@ const AppContent: React.FC = () => {
     duration: number;
   } | null>(null);
 
-  // Sync Firebase Auth state
+  // Sync Firebase Auth state — use ONLY real user data, no hardcoded fallbacks
   useEffect(() => {
     const unsubscribe = firebaseAuthService.onAuthStateChange((fbUser) => {
       if (fbUser) {
         const current = loadUserSession();
+        // Email-prefix as graceful name fallback (not a hardcoded identity)
+        const nameFromEmail = fbUser.email
+          ? fbUser.email.split('@')[0].replace(/[._]/g, ' ')
+          : '';
         const profile: UserProfile = {
-          uid: fbUser.uid,
-          name: fbUser.displayName || current?.name || 'Rider',
-          email: fbUser.email || current?.email || undefined,
-          phone: fbUser.phoneNumber || current?.phone || '+91 98765 43210',
-          photoURL: fbUser.photoURL || current?.photoURL || undefined,
+          uid:          fbUser.uid,
+          name:         fbUser.displayName || current?.name || nameFromEmail || '',
+          email:        fbUser.email         || current?.email    || undefined,
+          phone:        fbUser.phoneNumber   || current?.phone   || '',
+          photoURL:     fbUser.photoURL      || current?.photoURL|| undefined,
           authProvider: fbUser.phoneNumber ? 'phone' : 'google',
-          kyc: current?.kyc || null
+          kyc:          current?.uid === fbUser.uid ? (current?.kyc || null) : null
         };
         setUser(profile);
         saveUserSession(profile);
@@ -90,11 +96,39 @@ const AppContent: React.FC = () => {
   }, []);
 
   const handleSignOut = async () => {
+    // signOut() already calls clearUserSession(uid) internally
     await firebaseAuthService.signOut();
-    clearUserSession();
     setUser(null);
     showToast('Signed out successfully', 'info');
   };
+
+  // Handle DigiLocker OAuth redirect query params (?kyc_status=success or ?kyc_error=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const kycStatus = params.get('kyc_status');
+    const kycError = params.get('kyc_error');
+    const uidFromUrl = params.get('uid');
+
+    if (kycStatus === 'success') {
+      const activeUid = uidFromUrl || user?.uid || loadUserSession()?.uid;
+      if (activeUid) {
+        fetch(`/api/digilocker/status?uid=${encodeURIComponent(activeUid)}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.verified && data.kyc) {
+              saveUserKyc(data.kyc, activeUid);
+              setUser((prev) => (prev ? { ...prev, kyc: data.kyc } : prev));
+              showToast('DigiLocker Driving Licence verified successfully!', 'success');
+            }
+          })
+          .catch(() => {});
+      }
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (kycError) {
+      showToast(`DigiLocker Notice: ${decodeURIComponent(kycError).replace(/_/g, ' ')}`, 'error');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [user]);
 
 
   useEffect(() => {
@@ -193,6 +227,18 @@ const AppContent: React.FC = () => {
         user={user}
       />
 
+      {/* Dynamic Authenticated User Profile & DigiLocker KYC Banner (Req 4, 6, 14) */}
+      {user && (
+        <UserProfileBanner
+          user={user}
+          onSignOut={handleSignOut}
+          onKycUpdated={(kycData) => {
+            const updated = { ...user, kyc: kycData };
+            setUser(updated);
+            saveUserSession(updated);
+          }}
+        />
+      )}
 
       {/* Main App Body */}
       <main className="flex-1">
@@ -473,12 +519,14 @@ const AppContent: React.FC = () => {
         isOpen={isDigiLockerModalOpen}
         onClose={() => setIsDigiLockerModalOpen(false)}
         riderName={user?.name || 'Rider'}
-        riderPhone={user?.phone || '9876543210'}
+        riderPhone={user?.phone || ''}
+        user={user}
         onVerificationSuccess={(kycData) => {
           if (user) {
             const updated: UserProfile = { ...user, kyc: kycData };
             setUser(updated);
             saveUserSession(updated);
+            saveUserKyc(kycData, user.uid);
           }
         }}
       />
