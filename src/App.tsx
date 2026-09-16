@@ -18,6 +18,16 @@ import { VehicleListing } from './components/vehicles/VehicleListing';
 import { VehicleDetailsModal } from './components/vehicles/VehicleDetailsModal';
 import { BookingModal } from './components/booking/BookingModal';
 import { AuthModal } from './components/auth/AuthModal';
+import { DigiLockerModal } from './components/booking/DigiLockerModal';
+import {
+  firebaseAuthService,
+  loadUserSession,
+  saveUserSession,
+  clearUserSession,
+  UserProfile,
+  VerifiedKycData
+} from './lib/firebase';
+
 import { Vehicle, RateType, VehicleCategory } from './types';
 import { VEHICLES } from './data/vehicles';
 import {
@@ -40,36 +50,52 @@ const AppContent: React.FC = () => {
   // Navigation State
   const [currentTab, setCurrentTab] = useState('home');
   const [selectedCity, setSelectedCity] = useState('Dehradun (Bhauwala Main Hub)');
-  const [user, setUser] = useState<{ name: string; phone: string } | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(() => loadUserSession());
 
   // Modals State
   const [isPriceListOpen, setIsPriceListOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isDigiLockerModalOpen, setIsDigiLockerModalOpen] = useState(false);
   const [selectedVehicleForDetails, setSelectedVehicleForDetails] = useState<Vehicle | null>(null);
   const [bookingVehicle, setBookingVehicle] = useState<Vehicle | null>(null);
   const [bookingRateType, setBookingRateType] = useState<RateType>('fullday');
   const [bookingDuration, setBookingDuration] = useState(1);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [pendingBooking, setPendingBooking] = useState<{
+    vehicle: Vehicle;
+    rateType: RateType;
+    duration: number;
+  } | null>(null);
 
+  // Sync Firebase Auth state
   useEffect(() => {
-    const savedUser = localStorage.getItem('bbr-user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch {
-        localStorage.removeItem('bbr-user');
+    const unsubscribe = firebaseAuthService.onAuthStateChange((fbUser) => {
+      if (fbUser) {
+        const current = loadUserSession();
+        const profile: UserProfile = {
+          uid: fbUser.uid,
+          name: fbUser.displayName || current?.name || 'Rider',
+          email: fbUser.email || current?.email || undefined,
+          phone: fbUser.phoneNumber || current?.phone || '+91 98765 43210',
+          photoURL: fbUser.photoURL || current?.photoURL || undefined,
+          authProvider: fbUser.phoneNumber ? 'phone' : 'google',
+          kyc: current?.kyc || null
+        };
+        setUser(profile);
+        saveUserSession(profile);
       }
-    }
+    });
+    return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('bbr-user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('bbr-user');
-    }
-  }, [user]);
+  const handleSignOut = async () => {
+    await firebaseAuthService.signOut();
+    clearUserSession();
+    setUser(null);
+    showToast('Signed out successfully', 'info');
+  };
+
 
   useEffect(() => {
     const handleScroll = () => {
@@ -124,7 +150,8 @@ const AppContent: React.FC = () => {
     duration: number = 1
   ) => {
     if (!user) {
-      showToast('Please sign in to complete the booking.', 'info');
+      setPendingBooking({ vehicle, rateType, duration });
+      showToast('Please sign in via Free SMS OTP to complete your rental booking.', 'info');
       setIsAuthOpen(true);
       return;
     }
@@ -159,8 +186,11 @@ const AppContent: React.FC = () => {
         }}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenPriceList={() => setIsPriceListOpen(true)}
+        onOpenDigiLocker={() => setIsDigiLockerModalOpen(true)}
+        onSignOut={handleSignOut}
         user={user}
       />
+
 
       {/* Main App Body */}
       <main className="flex-1">
@@ -412,9 +442,45 @@ const AppContent: React.FC = () => {
 
       <AuthModal
         isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-        onLoginSuccess={(userData) => setUser(userData)}
+        onClose={() => {
+          setIsAuthOpen(false);
+          setPendingBooking(null);
+        }}
+        pendingVehicleName={pendingBooking?.vehicle.name}
+        onLoginSuccess={(userData) => {
+          const stored = loadUserSession() || {
+            uid: `user-${Date.now()}`,
+            name: userData.name,
+            phone: userData.phone,
+            email: userData.email,
+            authProvider: 'phone' as const,
+            kyc: null
+          };
+          setUser(stored);
+          if (pendingBooking) {
+            setBookingVehicle(pendingBooking.vehicle);
+            setBookingRateType(pendingBooking.rateType);
+            setBookingDuration(pendingBooking.duration);
+            setIsBookingModalOpen(true);
+            setPendingBooking(null);
+          }
+        }}
       />
+
+      <DigiLockerModal
+        isOpen={isDigiLockerModalOpen}
+        onClose={() => setIsDigiLockerModalOpen(false)}
+        riderName={user?.name || 'Rider'}
+        riderPhone={user?.phone || '9876543210'}
+        onVerificationSuccess={(kycData) => {
+          if (user) {
+            const updated: UserProfile = { ...user, kyc: kycData };
+            setUser(updated);
+            saveUserSession(updated);
+          }
+        }}
+      />
+
 
       {/* Rich Footer */}
       <Footer

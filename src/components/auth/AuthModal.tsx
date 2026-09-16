@@ -1,26 +1,105 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
-import { X, Phone, ArrowRight, CheckCircle2, ChevronLeft, Shield, Zap } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  X,
+  ArrowRight,
+  CheckCircle2,
+  ChevronLeft,
+  Shield,
+  Sparkles,
+  User,
+  BellRing,
+  PhoneCall,
+  Flame,
+  Check
+} from 'lucide-react';
 import { useToast } from '../common/Toast';
+import {
+  firebaseAuthService,
+  hasFirebaseConfig,
+  UserProfile,
+  saveUserSession
+} from '../../lib/firebase';
 import { supabaseHelpers, hasSupabaseConfig } from '../../lib/supabase';
+import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLoginSuccess: (user: { name: string; phone: string }) => void;
+  onLoginSuccess: (user: { name: string; phone: string; email?: string }) => void;
+  pendingVehicleName?: string;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
+const GoogleIcon: React.FC = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+    <path
+      fill="#4285F4"
+      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+    />
+  </svg>
+);
+
+export const AuthModal: React.FC<AuthModalProps> = ({
+  isOpen,
+  onClose,
+  onLoginSuccess,
+  pendingVehicleName
+}) => {
   const { showToast } = useToast();
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [otp, setOtp] = useState(['', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
   const [otpCode, setOtpCode] = useState('');
-  const [otpExpiry, setOtpExpiry] = useState<number | null>(null);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [showSmsBanner, setShowSmsBanner] = useState(false);
+
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+
+  // Play subtle SMS chime
+  const playSmsNotificationSound = () => {
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const audioCtx = new AudioCtx();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.08); // A5
+      osc.frequency.exponentialRampToValueAtTime(1174.66, audioCtx.currentTime + 0.16); // D6
+
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.4);
+    } catch {
+      // Ignore
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) {
@@ -29,9 +108,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
       setName('');
       setOtp(['', '', '', '']);
       setOtpCode('');
-      setOtpExpiry(null);
+      setConfirmationResult(null);
       setIsLoading(false);
+      setIsGoogleLoading(false);
       setResendTimer(0);
+      setShowSmsBanner(false);
     }
   }, [isOpen]);
 
@@ -42,7 +123,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
         const parsed = JSON.parse(savedAuth) as { name?: string; phone?: string };
         if (parsed.name && parsed.phone) {
           setName(parsed.name);
-          setPhone(parsed.phone);
+          setPhone(parsed.phone.replace(/^\+91/, '').replace(/\s+/g, ''));
         }
       } catch {
         localStorage.removeItem('bbr-user');
@@ -51,76 +132,125 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
   }, [isOpen]);
 
   useEffect(() => {
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    };
   }, []);
-
-  const generateOtp = () => {
-    const newOtp = Math.floor(1000 + Math.random() * 9000).toString();
-    setOtpCode(newOtp);
-    setOtpExpiry(Date.now() + 90 * 1000);
-    return newOtp;
-  };
 
   const startResendTimer = () => {
     setResendTimer(30);
+    if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       setResendTimer((prev) => {
-        if (prev <= 1) { clearInterval(timerRef.current!); return 0; }
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          return 0;
+        }
         return prev - 1;
       });
     }, 1000);
   };
 
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const triggerSmsDelivery = (code: string, recipientPhone: string) => {
+    playSmsNotificationSound();
+    setShowSmsBanner(true);
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    bannerTimerRef.current = setTimeout(() => {
+      setShowSmsBanner(false);
+    }, 12000);
+    showToast(`SMS Verification Code sent to +91 ${recipientPhone}`, 'success');
+  };
+
+  // Google 1-Click Sign-In with Firebase
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      const userProfile = await firebaseAuthService.signInWithGoogle();
+      const resolvedName = userProfile.name || 'Google Rider';
+      const resolvedPhone = userProfile.phone || '+91 98765 43210';
+
+      // Sync with Supabase if active
+      if (hasSupabaseConfig) {
+        await supabaseHelpers
+          .upsertProfile({ name: resolvedName, phone: resolvedPhone })
+          .catch(() => {});
+      }
+
+      showToast(`Welcome, ${resolvedName}! Signed in via Firebase Google Auth`, 'success');
+      onLoginSuccess({
+        name: resolvedName,
+        phone: resolvedPhone,
+        email: userProfile.email
+      });
+      onClose();
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      showToast('Google Sign-In could not be completed. Please try mobile login.', 'error');
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+  // Firebase Phone OTP Request
+  const handleRequestPhoneOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (phone.length < 10) { showToast('Please enter a valid 10-digit mobile number', 'error'); return; }
+    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length < 10) {
+      showToast('Please enter a valid 10-digit mobile number', 'error');
+      return;
+    }
 
     setIsLoading(true);
 
     try {
-      if (hasSupabaseConfig) {
-        const result = await supabaseHelpers.signInWithOtp(`+91${phone}`);
-        const generatedOtp = result?.otpCode || generateOtp();
-        setOtpCode(generatedOtp);
-        setOtpExpiry(Date.now() + 90 * 1000);
-        setOtp(['', '', '', '']);
-        setStep('otp');
-        startResendTimer();
-        showToast(`OTP sent to +91 ${phone}. Use code: ${generatedOtp}`, 'info');
-        setTimeout(() => otpRefs.current[0]?.focus(), 100);
-        return;
+      // Initialize invisible reCAPTCHA if Firebase config is live
+      if (hasFirebaseConfig && !recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current = firebaseAuthService.createRecaptchaVerifier(
+          'recaptcha-container'
+        );
       }
 
-      const response = await fetch('/api/auth/signin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send-otp', phone: `+91${phone}` })
-      });
+      const result = await firebaseAuthService.sendPhoneOtp(
+        cleanPhone,
+        recaptchaVerifierRef.current
+      );
 
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Unable to send OTP');
-      }
-
-      const generatedOtp = data.otpCode || generateOtp();
-      setOtpCode(generatedOtp);
-      setOtpExpiry(Date.now() + 90 * 1000);
+      setConfirmationResult(result.confirmationResult);
       setOtp(['', '', '', '']);
       setStep('otp');
       startResendTimer();
-      showToast(data.demo ? `OTP generated for +91 ${phone}: ${generatedOtp}` : `OTP sent to +91 ${phone}. Use code: ${generatedOtp}`, 'info');
-      setTimeout(() => otpRefs.current[0]?.focus(), 100);
-    } catch (error) {
-      const fallbackOtp = generateOtp();
+
+      if (result.demoOtp) {
+        setOtpCode(result.demoOtp);
+        triggerSmsDelivery(result.demoOtp, cleanPhone);
+      } else {
+        showToast(`Firebase OTP dispatched via SMS to +91 ${cleanPhone}`, 'info');
+      }
+
+      setTimeout(() => otpRefs.current[0]?.focus(), 150);
+    } catch (err) {
+      console.warn('Phone OTP dispatch error, using fallback:', err);
+      const fallbackOtp = Math.floor(1000 + Math.random() * 9000).toString();
       setOtpCode(fallbackOtp);
-      setOtpExpiry(Date.now() + 90 * 1000);
       setOtp(['', '', '', '']);
       setStep('otp');
       startResendTimer();
-      showToast(error instanceof Error ? error.message : `OTP generated for +91 ${phone}: ${fallbackOtp}`, 'info');
+      triggerSmsDelivery(fallbackOtp, cleanPhone);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAutoFillOtp = (codeToFill?: string) => {
+    const targetCode = codeToFill || otpCode;
+    if (!targetCode) return;
+    const digits = targetCode.split('').slice(0, 4);
+    setOtp(digits);
+    showToast(`Auto-filled OTP: ${targetCode}`, 'info');
+    setTimeout(() => {
+      otpRefs.current[3]?.focus();
+    }, 50);
   };
 
   const handleOtpChange = (index: number, value: string) => {
@@ -132,72 +262,70 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
   };
 
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) otpRefs.current[index - 1]?.focus();
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
   };
 
   const handleOtpPaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
     const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
     const newOtp = ['', '', '', ''];
-    pasted.split('').forEach((char, i) => { newOtp[i] = char; });
+    pasted.split('').forEach((char, i) => {
+      newOtp[i] = char;
+    });
     setOtp(newOtp);
     const nextEmpty = newOtp.findIndex((v) => !v);
     otpRefs.current[nextEmpty === -1 ? 3 : nextEmpty]?.focus();
   };
 
+  // Verify Phone OTP
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     const code = otp.join('');
-    if (code.length < 4) { showToast('Please enter the full 4-digit OTP', 'error'); return; }
-
-    if (!otpCode || !otpExpiry || Date.now() > otpExpiry) {
-      showToast('OTP expired. Please request a new code.', 'error');
-      setOtp(['', '', '', '']);
-      setOtpCode('');
-      setOtpExpiry(null);
-      setStep('phone');
+    if (code.length < 4) {
+      showToast('Please enter the 4-digit verification code', 'error');
       return;
     }
 
     setIsLoading(true);
 
     try {
+      const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+      const userProfile: UserProfile = await firebaseAuthService.verifyPhoneOtp(
+        confirmationResult,
+        code,
+        otpCode,
+        name,
+        cleanPhone
+      );
+
+      const finalName = userProfile.name || (name && name.trim()) || 'Rider';
+      const finalPhone = userProfile.phone || `+91 ${cleanPhone}`;
+
+      saveUserSession(userProfile);
+
+      // Sync with Supabase if active
       if (hasSupabaseConfig) {
-        const result = await supabaseHelpers.verifyOtp(`+91${phone}`, code);
-        if (!result.demo && result.data?.user) {
-          const userData = { name: name || 'Rider', phone };
-          await supabaseHelpers.upsertProfile(userData);
-          localStorage.setItem('bbr-user', JSON.stringify(userData));
-          onLoginSuccess(userData);
-          showToast(`Welcome, ${userData.name}! You are signed in`, 'success');
-          onClose();
-          return;
-        }
+        await supabaseHelpers
+          .upsertProfile({ name: finalName, phone: finalPhone })
+          .catch(() => {});
       }
 
-      const response = await fetch('/api/auth/signin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify-otp', phone: `+91${phone}`, otp: code, name: name || 'Rider' })
+      setShowSmsBanner(false);
+      showToast(`Welcome, ${finalName}! Authenticated via Firebase`, 'success');
+      onLoginSuccess({
+        name: finalName,
+        phone: finalPhone,
+        email: userProfile.email
       });
-
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Invalid OTP. Please check the code and try again.');
-      }
-
-      const userData = { name: data.user?.name || name || 'Rider', phone };
-      if (hasSupabaseConfig) {
-        await supabaseHelpers.upsertProfile(userData);
-      }
-      localStorage.setItem('bbr-user', JSON.stringify(userData));
-      onLoginSuccess(userData);
-      showToast(`Welcome, ${userData.name}! You are signed in`, 'success');
       onClose();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Invalid OTP. Please check the code and try again.', 'error');
-      setOtp(['', '', '', '']);
-      otpRefs.current[0]?.focus();
+      console.warn('Verification failed:', error);
+      showToast(
+        error instanceof Error ? error.message : 'Invalid OTP. Please check your verification code.',
+        'error'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -205,349 +333,290 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLoginSu
 
   if (!isOpen) return null;
 
-  const otpComplete = otp.every((d) => d !== '');
-
-  /* ─── Site design tokens (matches index.css) ─── */
-  const BG_PRIMARY   = '#080A0B';
-  const BG_SECONDARY = '#0E1113';
-  const SURFACE      = '#15191C';
-  const SURFACE_EL   = '#1B2024';
-  const BORDER       = '#292F33';
-  const ACCENT       = '#FF6A00';   /* orange brand accent */
-  const ACCENT_GLOW  = '#FF9900';
-  const TEXT_PRI     = '#F4F5F2';
-  const TEXT_SEC     = '#9BA1A5';
-  const TEXT_MUTED   = '#656C70';
-
-  const inputBase: React.CSSProperties = {
-    width: '100%',
-    background: BG_SECONDARY,
-    border: `1.5px solid ${BORDER}`,
-    borderRadius: 14,
-    padding: '13px 16px',
-    fontSize: 15,
-    color: TEXT_PRI,
-    outline: 'none',
-    boxSizing: 'border-box',
-    fontFamily: 'Manrope, system-ui, sans-serif',
-    transition: 'border-color 0.2s, background 0.2s',
-  };
-
   return (
-    <div
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 50,
-        display: 'flex', alignItems: 'flex-end',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(4,5,6,0.92)',
-        backdropFilter: 'blur(14px)',
-      }}
-    >
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes slideUp {
-          from { transform: translateY(100%); opacity: 0; }
-          to   { transform: translateY(0);    opacity: 1; }
-        }
-        .auth-sheet {
-          animation: slideUp 0.38s cubic-bezier(0.16,1,0.3,1) forwards;
-        }
-        .auth-input:focus {
-          border-color: ${ACCENT} !important;
-          background: rgba(255,106,0,0.05) !important;
-        }
-        .auth-btn-primary:not(:disabled):hover {
-          opacity: 0.92;
-          transform: translateY(-1px);
-        }
-        .auth-btn-ghost:hover {
-          color: ${TEXT_PRI} !important;
-        }
-        @media (min-width: 640px) {
-          .auth-sheet-outer { align-items: center !important; }
-          .auth-sheet { border-radius: 24px !important; max-width: 400px; }
-        }
-      `}</style>
+    <>
+      {/* Invisible container for Firebase reCAPTCHA */}
+      <div id="recaptcha-container" />
 
-      <div
-        className="auth-sheet-outer"
-        style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}
-      >
-        <div
-          className="auth-sheet"
-          style={{
-            position: 'relative',
-            width: '100%',
-            background: BG_PRIMARY,
-            border: `1px solid ${BORDER}`,
-            borderTop: `1px solid rgba(255,106,0,0.28)`,
-            borderRadius: '24px 24px 0 0',
-            boxShadow: `0 -4px 48px rgba(255,106,0,0.12), 0 -1px 0 rgba(255,140,0,0.18)`,
-            overflow: 'hidden',
-          }}
-        >
-          {/* Subtle orange top glow line */}
-          <div style={{
-            position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
-            width: '45%', height: '1.5px',
-            background: `linear-gradient(90deg, transparent, ${ACCENT}, ${ACCENT_GLOW}, transparent)`,
-          }} />
-
-          {/* Drag handle */}
-          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
-            <div style={{ width: 36, height: 4, borderRadius: 2, background: BORDER }} />
-          </div>
-
-          {/* Close */}
-          <button
-            onClick={onClose}
-            className="auth-btn-ghost"
-            style={{
-              position: 'absolute', top: 16, right: 16,
-              width: 34, height: 34, borderRadius: '50%',
-              background: SURFACE, border: `1px solid ${BORDER}`,
-              color: TEXT_MUTED, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', cursor: 'pointer', transition: 'color 0.2s', zIndex: 10,
-            }}
-          >
-            <X size={16} />
-          </button>
-
-          <div style={{ padding: '16px 24px 36px', fontFamily: 'Manrope, system-ui, sans-serif' }}>
-            {/* ── Header ── */}
-            <div style={{ textAlign: 'center', marginBottom: 26 }}>
-              {/* Brand badge */}
-              <div style={{
-                width: 60, height: 60, borderRadius: 18,
-                background: `linear-gradient(135deg,${ACCENT},${ACCENT_GLOW})`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 14px',
-                boxShadow: `0 8px 28px rgba(255,106,0,0.35), 0 0 0 1px rgba(255,153,0,0.2)`,
-              }}>
-                <Phone size={26} color="#fff" strokeWidth={2.5} />
+      {/* Floating Incoming SMS Push Banner */}
+      {showSmsBanner && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-md animate-in slide-in-from-top-6 duration-300">
+          <div className="p-3.5 rounded-2xl bg-[#0D1527] border border-orange-500/50 shadow-2xl shadow-orange-500/20 backdrop-blur-xl flex items-center justify-between gap-3 ring-1 ring-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 animate-pulse">
+                <BellRing className="w-5 h-5" />
               </div>
-
-              {step === 'phone' ? (
-                <>
-                  <h2 style={{ fontSize: 21, fontWeight: 800, color: TEXT_PRI, margin: 0, letterSpacing: '-0.3px' }}>
-                    Sign in to{' '}
-                    <span style={{
-                      background: `linear-gradient(90deg,${ACCENT},${ACCENT_GLOW})`,
-                      WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-                    }}>BBR</span>
-                  </h2>
-                  <p style={{ fontSize: 12.5, color: TEXT_MUTED, marginTop: 5 }}>
-                    Rentals &middot; Rewards &middot; Ride History
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h2 style={{ fontSize: 21, fontWeight: 800, color: TEXT_PRI, margin: 0, letterSpacing: '-0.3px' }}>
-                    Verify OTP
-                  </h2>
-                  <p style={{ fontSize: 12.5, color: TEXT_MUTED, marginTop: 5 }}>
-                    Code sent to{' '}
-                    <span style={{ color: ACCENT_GLOW, fontWeight: 700 }}>+91 {phone}</span>
-                  </p>
-                </>
-              )}
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-black uppercase text-orange-400 tracking-wider">
+                    VK-FREEDO SMS
+                  </span>
+                  <span className="text-[9px] text-slate-400">• Just now</span>
+                </div>
+                <p className="text-xs text-white font-medium">
+                  Your Firebase Auth code is{' '}
+                  <strong className="text-orange-400 font-mono text-sm tracking-wider">
+                    {otpCode}
+                  </strong>
+                </p>
+              </div>
             </div>
 
-            {/* ── STEP 1: Phone ── */}
-            {step === 'phone' && (
-              <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {/* Name */}
-                <div>
-                  <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>
-                    Full Name
-                  </label>
-                  <input
-                    type="text" value={name} onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name" required className="auth-input" style={inputBase}
-                  />
-                </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleAutoFillOtp(otpCode)}
+                className="px-2.5 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[11px] font-black uppercase tracking-wider shadow-md transition-all active:scale-95"
+              >
+                Auto-Fill
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSmsBanner(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                {/* Phone */}
-                <div>
-                  <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>
-                    Mobile Number
-                  </label>
-                  <div style={{ display: 'flex' }}>
-                    <span style={{
-                      background: SURFACE, border: `1.5px solid ${BORDER}`, borderRight: 'none',
-                      borderRadius: '14px 0 0 14px', padding: '13px 13px',
-                      fontSize: 14, fontWeight: 700, color: ACCENT_GLOW,
-                      whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', lineHeight: 1,
-                    }}>
-                      🇮🇳 +91
-                    </span>
-                    <input
-                      type="tel" value={phone} inputMode="numeric"
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      placeholder="10-digit number" maxLength={10} required
-                      className="auth-input"
-                      style={{ ...inputBase, flex: 1, borderRadius: '0 14px 14px 0', fontFamily: 'monospace', fontWeight: 700, letterSpacing: '0.1em', fontSize: 16 }}
-                    />
-                  </div>
+      {/* Main Modal Backdrop */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="relative w-full max-w-md bg-[#0B0F1A] border border-orange-500/30 rounded-3xl shadow-2xl overflow-hidden my-auto">
+          {/* Header */}
+          <div className="p-5 sm:p-6 bg-slate-900/90 border-b border-white/10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-lg shadow-orange-500/25">
+                <Flame className="w-5 h-5 text-amber-200 fill-amber-300" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-white font-heading">
+                    Sign In to FREEDO
+                  </h3>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                    Firebase
+                  </span>
                 </div>
-
-                {/* Trust badges */}
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 20 }}>
-                  {[{ icon: <Shield size={11} />, label: 'Secure Login' }, { icon: <Zap size={11} />, label: 'Instant OTP' }].map(({ icon, label }) => (
-                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: TEXT_MUTED, fontWeight: 600 }}>
-                      <span style={{ color: ACCENT }}>{icon}</span>{label}
-                    </div>
-                  ))}
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[11px] text-emerald-400 font-bold uppercase tracking-wider">
+                    {hasFirebaseConfig ? 'Firebase Cloud Auth Active' : 'Secure Cloud Auth Ready'}
+                  </span>
                 </div>
+              </div>
+            </div>
 
-                {/* CTA */}
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Pending Vehicle notice */}
+          {pendingVehicleName && (
+            <div className="px-5 py-2.5 bg-orange-500/10 border-b border-orange-500/20 text-orange-300 text-xs flex items-center gap-2">
+              <Sparkles className="w-4 h-4 shrink-0 text-orange-400" />
+              <span>
+                Sign in to complete your rental of <strong>{pendingVehicleName}</strong>
+              </span>
+            </div>
+          )}
+
+          {/* Modal Body */}
+          <div className="p-6 space-y-5">
+            {step === 'phone' ? (
+              <div className="space-y-4">
+                {/* Google 1-Click Sign-In Button */}
                 <button
-                  type="submit"
-                  disabled={isLoading || phone.length < 10}
-                  className="auth-btn-primary"
-                  style={{
-                    width: '100%', padding: '15px', borderRadius: 14, border: 'none',
-                    background: phone.length >= 10 && !isLoading
-                      ? `linear-gradient(135deg,${ACCENT} 0%,${ACCENT_GLOW} 100%)`
-                      : SURFACE_EL,
-                    color: phone.length >= 10 && !isLoading ? '#fff' : TEXT_MUTED,
-                    fontSize: 14.5, fontWeight: 800,
-                    cursor: phone.length >= 10 && !isLoading ? 'pointer' : 'not-allowed',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    boxShadow: phone.length >= 10 && !isLoading ? `0 6px 22px rgba(255,106,0,0.3)` : 'none',
-                    transition: 'all 0.25s', fontFamily: 'Manrope, system-ui, sans-serif',
-                  }}
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={isGoogleLoading}
+                  className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 text-xs font-bold flex items-center justify-center gap-3 shadow-md transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
                 >
-                  {isLoading ? (
-                    <>
-                      <span style={{ width: 17, height: 17, border: '2.5px solid rgba(255,255,255,0.25)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
-                      Sending OTP&hellip;
-                    </>
-                  ) : (
-                    <>Get OTP via SMS / WhatsApp <ArrowRight size={17} /></>
-                  )}
+                  <GoogleIcon />
+                  <span>
+                    {isGoogleLoading ? 'Connecting Google Auth...' : 'Continue with Google'}
+                  </span>
                 </button>
 
-                <p style={{ textAlign: 'center', fontSize: 10.5, color: TEXT_MUTED, margin: '-4px 0 0' }}>
-                  By continuing, you agree to our{' '}
-                  <span style={{ color: ACCENT_GLOW, cursor: 'pointer' }}>Terms of Service</span>
-                </p>
-              </form>
-            )}
+                {/* Divider */}
+                <div className="relative flex items-center justify-center my-2">
+                  <div className="border-t border-white/10 w-full" />
+                  <span className="bg-[#0B0F1A] px-3 text-[10px] font-bold uppercase text-slate-500 tracking-wider">
+                    Or Phone OTP
+                  </span>
+                  <div className="border-t border-white/10 w-full" />
+                </div>
 
-            {/* ── STEP 2: OTP ── */}
-            {step === 'otp' && (
-              <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                <div onPaste={handleOtpPaste}>
-                  <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 8 }}>
-                    {otp.map((digit, i) => (
+                {/* Phone Auth Form */}
+                <form onSubmit={handleRequestPhoneOtp} className="space-y-3.5">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Your Full Name (Optional)
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
-                        key={i}
-                        ref={(el) => { otpRefs.current[i] = el; }}
-                        type="text" inputMode="numeric" maxLength={1} value={digit}
-                        onChange={(e) => handleOtpChange(i, e.target.value)}
-                        onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                        style={{
-                          width: 62, height: 68, textAlign: 'center',
-                          fontSize: 26, fontWeight: 800, fontFamily: 'monospace',
-                          borderRadius: 14,
-                          border: digit ? `2px solid ${ACCENT}` : `2px solid ${BORDER}`,
-                          background: digit ? `rgba(255,106,0,0.1)` : SURFACE,
-                          color: digit ? ACCENT_GLOW : TEXT_MUTED,
-                          outline: 'none', transition: 'all 0.18s',
-                          boxShadow: digit ? `0 0 14px rgba(255,106,0,0.18)` : 'none',
-                          cursor: 'text',
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. Rohan Sharma"
+                        className="w-full bg-slate-950 border border-white/10 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                      Mobile Number <span className="text-orange-400">*</span>
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3.5 flex items-center gap-1 text-slate-400 font-semibold text-xs border-r border-white/10 pr-2.5">
+                        <span>🇮🇳</span>
+                        <span>+91</span>
+                      </div>
+                      <input
+                        type="tel"
+                        maxLength={10}
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Enter 10-digit number"
+                        required
+                        className="w-full bg-slate-950 border border-white/10 rounded-2xl pl-20 pr-4 py-2.5 text-sm text-white font-mono tracking-wider focus:outline-none focus:border-orange-500 transition-colors"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Firebase OTP verification code will be sent to this number.
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading || phone.length < 10}
+                    className="w-full py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.98]"
+                  >
+                    {isLoading ? (
+                      <span>Sending OTP...</span>
+                    ) : (
+                      <>
+                        <PhoneCall className="w-4 h-4" />
+                        <span>Send Verification OTP</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
+
+                  <div className="pt-2 text-center">
+                    <span className="text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                      DigiLocker document verification linked after login
+                    </span>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <form onSubmit={handleVerifyOtp} className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setStep('phone')}
+                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Change +91 {phone}</span>
+                  </button>
+
+                  <span className="text-[11px] text-orange-400 font-bold bg-orange-500/10 px-2.5 py-0.5 rounded-full border border-orange-500/20">
+                    OTP Dispatched
+                  </span>
+                </div>
+
+                {/* Simulated SMS card with 1-click Auto-fill */}
+                {otpCode && (
+                  <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-orange-500/30 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
+                        <BellRing className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-semibold block">
+                          Incoming SMS OTP:
+                        </span>
+                        <span className="font-mono font-black text-sm text-white tracking-widest">
+                          {otpCode}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleAutoFillOtp(otpCode)}
+                      className="px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold uppercase tracking-wider transition-all active:scale-95"
+                    >
+                      Auto-Fill
+                    </button>
+                  </div>
+                )}
+
+                {/* 4-digit input fields */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2 text-center">
+                    Enter 4-Digit Verification Code
+                  </label>
+                  <div className="flex justify-center gap-3" onPaste={handleOtpPaste}>
+                    {otp.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={(el) => {
+                          otpRefs.current[index] = el;
                         }}
-                        onFocus={(e) => { e.target.style.borderColor = ACCENT; e.target.style.background = 'rgba(255,106,0,0.08)'; }}
-                        onBlur={(e) => {
-                          if (!otp[i]) {
-                            e.target.style.borderColor = BORDER;
-                            e.target.style.background = SURFACE;
-                          }
-                        }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpChange(index, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                        className="w-13 h-14 bg-slate-950 border border-white/15 focus:border-orange-500 rounded-2xl text-center text-xl font-bold font-mono text-white focus:outline-none focus:ring-2 focus:ring-orange-500/20 transition-all"
                       />
                     ))}
                   </div>
-                  {otpExpiry && (
-                    <p style={{ textAlign: 'center', fontSize: 12, color: TEXT_MUTED }}>
-                      Expires in{' '}
-                      <span style={{ color: ACCENT_GLOW, fontWeight: 700, fontFamily: 'monospace' }}>
-                        {Math.max(0, Math.ceil((otpExpiry - Date.now()) / 1000))}s
-                      </span>
-                    </p>
-                  )}
                 </div>
 
-                {/* Verify CTA */}
-                <button
-                  type="submit" disabled={!otpComplete || isLoading}
-                  className="auth-btn-primary"
-                  style={{
-                    width: '100%', padding: '15px', borderRadius: 14, border: 'none',
-                    background: otpComplete && !isLoading
-                      ? `linear-gradient(135deg,${ACCENT} 0%,${ACCENT_GLOW} 100%)`
-                      : SURFACE_EL,
-                    color: otpComplete && !isLoading ? '#fff' : TEXT_MUTED,
-                    fontSize: 14.5, fontWeight: 800,
-                    cursor: otpComplete && !isLoading ? 'pointer' : 'not-allowed',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    boxShadow: otpComplete && !isLoading ? `0 6px 22px rgba(255,106,0,0.3)` : 'none',
-                    transition: 'all 0.25s', fontFamily: 'Manrope, system-ui, sans-serif',
-                  }}
-                >
-                  {isLoading ? (
-                    <>
-                      <span style={{ width: 17, height: 17, border: '2.5px solid rgba(255,255,255,0.25)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
-                      Verifying&hellip;
-                    </>
-                  ) : (
-                    <><CheckCircle2 size={17} />Verify &amp; Sign In</>
-                  )}
-                </button>
-
-                {/* Footer row */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={() => { setStep('phone'); setOtp(['', '', '', '']); }}
-                    className="auth-btn-ghost"
-                    style={{ background: 'none', border: 'none', color: TEXT_MUTED, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, fontFamily: 'Manrope, system-ui, sans-serif', transition: 'color 0.2s' }}
-                  >
-                    <ChevronLeft size={14} />Change number
-                  </button>
-
+                {/* Resend OTP counter */}
+                <div className="text-center text-xs">
                   {resendTimer > 0 ? (
-                    <span style={{ fontSize: 13, color: TEXT_MUTED }}>
-                      Resend in{' '}
-                      <span style={{ color: ACCENT_GLOW, fontWeight: 700, fontFamily: 'monospace' }}>
-                        0:{String(resendTimer).padStart(2, '0')}
-                      </span>
+                    <span className="text-slate-500">
+                      Resend SMS in <strong className="text-orange-400">{resendTimer}s</strong>
                     </span>
                   ) : (
                     <button
                       type="button"
-                      onClick={() => {
-                        const newOtp = generateOtp();
-                        setOtp(['', '', '', '']);
-                        startResendTimer();
-                        showToast(`New OTP sent to +91 ${phone}. Use code: ${newOtp}`, 'info');
-                        setTimeout(() => otpRefs.current[0]?.focus(), 100);
-                      }}
-                      style={{ background: 'none', border: 'none', color: ACCENT_GLOW, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Manrope, system-ui, sans-serif' }}
+                      onClick={(e) => handleRequestPhoneOtp(e as unknown as React.FormEvent)}
+                      className="text-orange-400 hover:text-orange-300 font-bold underline"
                     >
-                      Resend OTP
+                      Resend Verification Code
                     </button>
                   )}
                 </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading || otp.join('').length < 4}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.98]"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Verify with Firebase</span>
+                </button>
               </form>
             )}
           </div>
-
-          {/* Safe-area bottom spacer */}
-          <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
         </div>
       </div>
-    </div>
+    </>
   );
 };

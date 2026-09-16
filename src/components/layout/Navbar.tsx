@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Bike,
   Car,
@@ -10,9 +10,14 @@ import {
   FileText,
   ChevronDown,
   Sparkles,
-  Clock
+  Clock,
+  ShieldCheck,
+  LogOut,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { LOCATIONS } from '../../data/locations';
+import type { VerifiedKycData } from '../../lib/firebase';
 
 interface NavbarProps {
   currentTab: string;
@@ -21,7 +26,15 @@ interface NavbarProps {
   onSelectCity: (city: string) => void;
   onOpenAuth: () => void;
   onOpenPriceList: () => void;
-  user: { name: string; phone: string } | null;
+  onOpenDigiLocker?: () => void;
+  onSignOut?: () => void;
+  user: {
+    name: string;
+    phone: string;
+    email?: string;
+    photoURL?: string;
+    kyc?: VerifiedKycData | null;
+  } | null;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -31,16 +44,35 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectCity,
   onOpenAuth,
   onOpenPriceList,
+  onOpenDigiLocker,
+  onSignOut,
   user
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cityDropdownOpen, setCityDropdownOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+
+  const userDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        userDropdownRef.current &&
+        !userDropdownRef.current.contains(event.target as Node)
+      ) {
+        setUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const navLinks = [
@@ -53,6 +85,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'offers', label: 'Offers' },
     { id: 'contact', label: 'Contact' },
   ];
+
+  const isKycVerified = user?.kyc?.status === 'verified';
 
   return (
     <>
@@ -91,7 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* ── Main Sticky Navbar — Glassmorphism ── */}
+      {/* ── Main Sticky Navbar ── */}
       <header
         className={`sticky top-0 z-40 w-full transition-all duration-300 ${isScrolled ? 'glass-nav py-3' : 'py-4'}`}
         style={!isScrolled ? {
@@ -161,7 +195,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {cityDropdownOpen && (
               <div
-                className="absolute top-full mt-2 left-0 w-64 rounded-2xl shadow-2xl py-2 z-50"
+                className="absolute top-full mt-2 left-0 w-64 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in"
                 style={{ backgroundColor: '#111111', border: '1px solid #2A2A2A' }}
               >
                 <div
@@ -222,12 +256,115 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {user ? (
-              <div
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium"
-                style={{ backgroundColor: 'rgba(26,26,26,0.7)', border: '1px solid #2A2A2A', color: '#9BA1A5' }}
-              >
-                <User className="w-3.5 h-3.5" style={{ color: '#FF6A00' }} />
-                <span>{user.name.split(' ')[0]}</span>
+              <div className="relative" ref={userDropdownRef}>
+                <button
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:border-orange-500/40"
+                  style={{
+                    backgroundColor: 'rgba(26,26,26,0.85)',
+                    border: isKycVerified ? '1px solid rgba(16,185,129,0.3)' : '1px solid #2A2A2A',
+                    color: '#F4F5F2'
+                  }}
+                >
+                  {user.photoURL ? (
+                    <img
+                      src={user.photoURL}
+                      alt={user.name}
+                      className="w-5 h-5 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center font-bold text-[10px]">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span>{user.name.split(' ')[0]}</span>
+                  {isKycVerified ? (
+                    <span title="DigiLocker Verified">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    </span>
+                  ) : (
+                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                  )}
+                </button>
+
+                {/* User Dropdown Menu */}
+                {userDropdownOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-2 w-72 rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in space-y-3"
+                    style={{ backgroundColor: '#111622', border: '1px solid rgba(255,106,0,0.2)' }}
+                  >
+                    {/* User Info */}
+                    <div className="pb-2.5 border-b border-white/10">
+                      <div className="font-bold text-sm text-white">{user.name}</div>
+                      <div className="text-xs text-slate-400 font-mono mt-0.5">{user.phone}</div>
+                      {user.email && (
+                        <div className="text-[11px] text-slate-500 truncate">{user.email}</div>
+                      )}
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                          Firebase Auth Active
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* DigiLocker KYC Status Section */}
+                    <div className="p-2.5 rounded-xl bg-slate-900/90 border border-white/5 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-300">DigiLocker KYC:</span>
+                        {isKycVerified ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Verified
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
+                            <AlertCircle className="w-3 h-3" />
+                            Pending
+                          </span>
+                        )}
+                      </div>
+
+                      {isKycVerified && user.kyc?.dlNumber && (
+                        <div className="text-[11px] font-mono text-slate-400">
+                          DL: <span className="text-white font-bold">{user.kyc.dlNumber}</span>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserDropdownOpen(false);
+                          if (onOpenDigiLocker) onOpenDigiLocker();
+                        }}
+                        className="w-full py-1.5 px-2.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                        style={{
+                          backgroundColor: isKycVerified ? 'rgba(16,185,129,0.1)' : 'rgba(0,116,228,0.2)',
+                          color: isKycVerified ? '#34D399' : '#38BDF8',
+                          border: isKycVerified
+                            ? '1px solid rgba(16,185,129,0.25)'
+                            : '1px solid rgba(0,116,228,0.35)'
+                        }}
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>{isKycVerified ? 'View DigiLocker Pass' : 'Verify with DigiLocker'}</span>
+                      </button>
+                    </div>
+
+                    {/* Sign Out Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserDropdownOpen(false);
+                        if (onSignOut) onSignOut();
+                      }}
+                      className="w-full py-2 px-3 rounded-xl text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-500/10 flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <button
@@ -256,15 +393,20 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* ── Mobile Action Buttons — Phone View ── */}
           <div className="flex items-center gap-2 sm:hidden">
-            {/* Sign In / User — NOW VISIBLE ON MOBILE */}
             {user ? (
-              <div
+              <button
+                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium"
-                style={{ backgroundColor: 'rgba(26,26,26,0.7)', border: '1px solid #2A2A2A', color: '#9BA1A5' }}
+                style={{
+                  backgroundColor: 'rgba(26,26,26,0.7)',
+                  border: isKycVerified ? '1px solid rgba(16,185,129,0.4)' : '1px solid #2A2A2A',
+                  color: '#9BA1A5'
+                }}
               >
                 <User className="w-4 h-4" style={{ color: '#FF6A00' }} />
                 <span className="max-w-[60px] truncate">{user.name.split(' ')[0]}</span>
-              </div>
+                {isKycVerified && <ShieldCheck className="w-3 h-3 text-emerald-400" />}
+              </button>
             ) : (
               <button
                 onClick={onOpenAuth}
@@ -300,7 +442,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* ── Mobile Slide-in Drawer ── */}
         {mobileMenuOpen && (
           <div
-            className="xl:hidden px-5 py-6 space-y-4"
+            className="xl:hidden px-5 py-6 space-y-4 animate-in slide-in-from-top-4 duration-200"
             style={{
               borderTop: '1px solid rgba(255,106,0,0.1)',
               backgroundColor: 'rgba(10,10,10,0.95)',
@@ -308,6 +450,52 @@ export const Navbar: React.FC<NavbarProps> = ({
               WebkitBackdropFilter: 'blur(20px)'
             }}
           >
+            {/* User Profile in Mobile Drawer */}
+            {user && (
+              <div className="p-3 rounded-2xl bg-slate-900 border border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-sm text-white">{user.name}</div>
+                    <div className="text-xs text-slate-400 font-mono">{user.phone}</div>
+                  </div>
+                  {isKycVerified ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      DigiLocker Verified
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                      KYC Pending
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (onOpenDigiLocker) onOpenDigiLocker();
+                    }}
+                    className="flex-1 py-1.5 px-3 rounded-xl bg-blue-600/30 border border-blue-500/40 text-blue-300 text-xs font-bold flex items-center justify-center gap-1.5"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>{isKycVerified ? 'View DigiLocker' : 'Verify DigiLocker'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (onSignOut) onSignOut();
+                    }}
+                    className="py-1.5 px-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Location picker */}
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: '#656C70' }}>
@@ -352,7 +540,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* CTA — Sign In + Browse + Call */}
             <div className="space-y-2" style={{ borderTop: '1px solid #2A2A2A', paddingTop: '1rem' }}>
-              {/* Sign In CTA in Mobile Drawer */}
               {!user && (
                 <button
                   onClick={() => { onOpenAuth(); setMobileMenuOpen(false); }}
@@ -364,7 +551,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }}
                 >
                   <User className="w-4 h-4" />
-                  <span>Sign In / Create Account</span>
+                  <span>Sign In with Firebase</span>
                 </button>
               )}
 

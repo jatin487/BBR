@@ -495,14 +495,11 @@ function PhotorealisticGT650Mesh({ theme }: { theme: typeof colorThemes['chrome'
 }
 
 // GLTF model wrapper
-function GLTFModelWrapper({ theme }: { theme: typeof colorThemes['chrome'] }) {
-  try {
-    const gltf = useGLTF('/models/gt650.glb');
-    return <primitive object={gltf.scene} scale={1.25} position={[0, -0.7, 0]} />;
-  } catch {
-    return <PhotorealisticGT650Mesh theme={theme} />;
-  }
+function GLTFModelWrapper({ theme: _theme }: { theme: typeof colorThemes['chrome'] }) {
+  const gltf = useGLTF('/models/gt650.glb');
+  return <primitive object={gltf.scene} scale={1.25} position={[0, -0.7, 0]} />;
 }
+
 
 export const GT650Model: React.FC<GT650ModelProps> = ({
   color,
