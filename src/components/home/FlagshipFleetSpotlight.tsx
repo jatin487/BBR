@@ -148,9 +148,9 @@ export const FlagshipFleetSpotlight: React.FC<FlagshipFleetSpotlightProps> = ({
   };
 
   return (
-    <section className="relative py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-hidden">
+    <section className="relative py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       {/* Background Decorative Ambient Glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] max-w-full h-[500px] bg-gradient-to-tr from-orange-600/10 via-amber-500/10 to-transparent rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] max-w-full h-[500px] bg-gradient-to-tr from-orange-600/10 via-amber-500/10 to-transparent rounded-full blur-[140px] pointer-events-none overflow-hidden" />
 
       {/* Header */}
       <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-14">
@@ -217,6 +217,7 @@ export const FlagshipFleetSpotlight: React.FC<FlagshipFleetSpotlightProps> = ({
 
               {/* Sound Synthesizer Button */}
               <button
+                type="button"
                 onClick={toggleEngineAudio}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
                   isPlayingAudio
@@ -397,7 +398,7 @@ export const FlagshipFleetSpotlight: React.FC<FlagshipFleetSpotlightProps> = ({
                     e.stopPropagation();
                     onBookNow(currentVehicle, 'fullday');
                   }}
-                  className="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-wider transition-all shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 group cursor-pointer active:scale-95 touch-manipulation select-none"
+                  className="flex-1 sm:flex-initial min-h-[48px] px-6 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-wider transition-all shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 group cursor-pointer active:scale-95 touch-manipulation select-none"
                 >
                   <span>Instant Reserve</span>
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

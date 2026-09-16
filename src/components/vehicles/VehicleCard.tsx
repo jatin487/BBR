@@ -199,8 +199,9 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
 
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => onSelect(vehicle)}
-              className="w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1"
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onSelect(vehicle); }}
+              className="w-full min-h-[44px] py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 touch-manipulation select-none"
               style={{ backgroundColor: '#222222', border: '1px solid #2A2A2A', color: '#9BA1A5' }}
             >
               <Info className="w-3.5 h-3.5" />
@@ -208,8 +209,9 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
             </button>
 
             <button
-              onClick={() => onBookNow(vehicle, rateType)}
-              className="w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1"
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onBookNow(vehicle, rateType); }}
+              className="w-full min-h-[44px] py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1 touch-manipulation select-none cursor-pointer"
               style={{ background: 'linear-gradient(135deg, #FF6A00, #FF8C33)', color: '#fff', boxShadow: '0 4px 12px rgba(255,106,0,0.25)' }}
             >
               <span>Rent Now</span>

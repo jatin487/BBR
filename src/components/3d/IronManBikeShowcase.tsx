@@ -521,8 +521,12 @@ export const IronManBikeShowcase: React.FC<IronManShowcaseProps> = ({ onBookNow 
             {/* Action Buttons: Reserve GT 650 & Sound Simulator */}
             <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
               <button
-                onClick={() => onBookNow(gt650Vehicle, 'fullday')}
-                className="w-full flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs uppercase tracking-wider shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBookNow(gt650Vehicle, 'fullday');
+                }}
+                className="w-full flex-1 min-h-[48px] py-3.5 px-6 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs uppercase tracking-wider shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all touch-manipulation select-none cursor-pointer"
               >
                 <Sparkles className="w-4 h-4 text-amber-200" />
                 <span>Instant Reserve (₹3,000/day)</span>

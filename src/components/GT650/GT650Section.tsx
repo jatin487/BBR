@@ -185,8 +185,12 @@ export const GT650Section: React.FC<GT650SectionProps> = ({ onBookNow }) => {
 
             {/* Rent Now Button */}
             <button
-              onClick={() => onBookNow(gt650Vehicle, 'fullday')}
-              className="w-full sm:w-auto min-w-[220px] px-8 py-4 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm uppercase tracking-wider shadow-xl shadow-orange-500/25 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onBookNow(gt650Vehicle, 'fullday');
+              }}
+              className="w-full sm:w-auto min-w-[220px] min-h-[48px] px-8 py-4 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm uppercase tracking-wider shadow-xl shadow-orange-500/25 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 touch-manipulation select-none cursor-pointer"
             >
               RENT NOW <ChevronRight className="w-4 h-4" />
             </button>
