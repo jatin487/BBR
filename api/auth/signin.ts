@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { saveUser, getUserByPhone } from '../_lib/storage';
+import { saveUser, getUserByPhone } from '../_lib/storage.js';
+
 
 const OTP_STORE: Record<string, { code: string; expiresAt: number }> = {};
 

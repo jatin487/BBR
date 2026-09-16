@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { saveBooking } from '../_lib/storage';
+import { saveBooking } from '../_lib/storage.js';
+
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
