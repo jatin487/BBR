@@ -41,15 +41,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   // Multi-step State (1 to 6)
   const [currentStep, setCurrentStep] = useState(1);
-  const [vehicle] = useState<Vehicle | null>(initialVehicle);
+  const vehicle = initialVehicle;
   const [rateType, setRateType] = useState<RateType>(initialRateType);
   const [duration, setDuration] = useState(initialDuration);
 
   // Step 2: Location & Dates
-  const [city] = useState(initialCity);
+  const [city, setCity] = useState(initialCity);
   const currentHub = LOCATIONS.find((l) => l.city.toLowerCase() === city.toLowerCase()) || LOCATIONS[0];
   const [pickupHub, setPickupHub] = useState(currentHub.branches[0]?.name || 'Central BBR Hub');
   const [dropHub, setDropHub] = useState(currentHub.branches[0]?.name || 'Central BBR Hub');
+
 
   const today = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -86,6 +87,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setCurrentStep(1);
+      if (initialRateType) setRateType(initialRateType);
+      if (initialDuration) setDuration(initialDuration);
+      if (initialCity) setCity(initialCity);
+
       const activeSession = loadUserSession();
       const activeKyc = activeSession?.kyc || loadUserKyc();
       if (activeSession?.name) setCustomerName(activeSession.name);
@@ -99,7 +105,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         setAadhaarNumber(activeKyc.aadhaarNumber);
       }
     }
-  }, [isOpen]);
+  }, [isOpen, initialRateType, initialDuration, initialCity]);
+
 
 
   // Step 5: Billing & Promo

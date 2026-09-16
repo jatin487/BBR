@@ -378,18 +378,26 @@ export const FlagshipFleetSpotlight: React.FC<FlagshipFleetSpotlightProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 relative z-20">
                 {onSelectVehicle && (
                   <button
-                    onClick={() => onSelectVehicle(currentVehicle)}
-                    className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs transition-all border border-white/10"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectVehicle(currentVehicle);
+                    }}
+                    className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs transition-all border border-white/10 cursor-pointer active:scale-95 touch-manipulation"
                   >
                     View Specs
                   </button>
                 )}
                 <button
-                  onClick={() => onBookNow(currentVehicle, 'fullday')}
-                  className="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-wider transition-all shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 group"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onBookNow(currentVehicle, 'fullday');
+                  }}
+                  className="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-wider transition-all shadow-xl shadow-orange-500/25 flex items-center justify-center gap-2 group cursor-pointer active:scale-95 touch-manipulation select-none"
                 >
                   <span>Instant Reserve</span>
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

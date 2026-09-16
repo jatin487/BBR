@@ -149,18 +149,20 @@ const AppContent: React.FC = () => {
     rateType: RateType = 'fullday',
     duration: number = 1
   ) => {
+    setBookingVehicle(vehicle);
+    setBookingRateType(rateType);
+    setBookingDuration(duration);
+
     if (!user) {
       setPendingBooking({ vehicle, rateType, duration });
-      showToast('Please sign in via Free SMS OTP to complete your rental booking.', 'info');
+      showToast('Please sign in to proceed with your rental booking.', 'info');
       setIsAuthOpen(true);
       return;
     }
 
-    setBookingVehicle(vehicle);
-    setBookingRateType(rateType);
-    setBookingDuration(duration);
     setIsBookingModalOpen(true);
   };
+
 
   // Apply Promo Offer
   const handleApplyOffer = (code: string) => {
