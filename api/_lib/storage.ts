@@ -26,9 +26,21 @@ export type StoredBooking = {
   totalAmount: number;
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   paymentMethod: string;
   createdAt: string;
   status: string;
+  // Taxi-specific fields
+  type?: 'bike' | 'taxi';
+  pickupAddress?: string;
+  dropAddress?: string;
+  driverName?: string;
+  driverPhone?: string;
+  driverVehicle?: string;
+  estimatedFare?: number;
+  estimatedDistance?: string;
+  passengerCount?: number;
+  specialInstructions?: string;
 };
 
 export type BackendKycRecord = {
@@ -103,6 +115,13 @@ export const saveBooking = (booking: StoredBooking) => {
   const next = { ...data, bookings: [...data.bookings, booking] };
   writeData(next);
   return booking;
+};
+
+export const updateBooking = (id: string, updates: Partial<StoredBooking>) => {
+  const data = readData();
+  const nextBookings = data.bookings.map((b) => (b.id === id ? { ...b, ...updates } : b));
+  writeData({ ...data, bookings: nextBookings });
+  return nextBookings.find((b) => b.id === id) || null;
 };
 
 export const getUserByPhone = (phone: string) => {

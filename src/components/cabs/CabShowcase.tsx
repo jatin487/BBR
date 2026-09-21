@@ -181,22 +181,32 @@ export const CabShowcase: React.FC<CabShowcaseProps> = ({ onBookPackage, onBookC
               </p>
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap">
+              {onBookCab && (
+                <button
+                  type="button"
+                  onClick={() => onBookCab(selectedCab)}
+                  className="flex-1 sm:flex-initial px-5 py-3.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 transition-all cursor-pointer"
+                >
+                  <Car className="w-4 h-4" />
+                  <span>Book Online</span>
+                </button>
+              )}
               <a
                 href={`https://wa.me/918507067716?text=Hi%20BBR%20Rental!%20I%20want%20to%20book%20a%20cab%20from%20${encodeURIComponent(calcPickup)}%20to%20${encodeURIComponent(calcDestination)}%20with%20${encodeURIComponent(selectedCab.name)}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex-1 sm:flex-initial px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all"
+                className="flex-1 sm:flex-initial px-5 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition-all"
               >
                 <MessageSquare className="w-4 h-4" />
-                <span>Book via WhatsApp</span>
+                <span>WhatsApp</span>
               </a>
               <a
                 href="tel:8507067716"
-                className="px-5 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 transition-all"
+                className="px-4 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center justify-center gap-2 border border-white/10 transition-all"
               >
-                <Phone className="w-4 h-4" />
-                <span>Call Hotline</span>
+                <Phone className="w-4 h-4 text-orange-400" />
+                <span>Call</span>
               </a>
             </div>
           </div>
@@ -270,13 +280,23 @@ export const CabShowcase: React.FC<CabShowcaseProps> = ({ onBookPackage, onBookC
                     </span>
                   </div>
 
-                  <a
-                    href="tel:8507067716"
-                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-orange-500/20 transition-all hover:scale-105"
-                  >
-                    <Phone className="w-3.5 h-3.5" />
-                    <span>Book Taxi</span>
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onBookPackage ? onBookPackage(pkg) : onBookCab?.(CAB_FLEET[0])}
+                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-orange-500/20 transition-all hover:scale-105 cursor-pointer"
+                    >
+                      <Navigation className="w-3.5 h-3.5" />
+                      <span>Book Online</span>
+                    </button>
+                    <a
+                      href="tel:8507067716"
+                      className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all border border-white/10 flex items-center justify-center"
+                      title="Call Hotline"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-orange-400" />
+                    </a>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -343,13 +363,23 @@ export const CabShowcase: React.FC<CabShowcaseProps> = ({ onBookPackage, onBookC
                     <span className="text-xs text-slate-400 font-medium"> / km</span>
                   </div>
 
-                  <a
-                    href="tel:8507067716"
-                    className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10 flex items-center gap-1.5"
-                  >
-                    <Phone className="w-3.5 h-3.5 text-orange-400" />
-                    <span>Reserve Cab</span>
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onBookCab?.(cab)}
+                      className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold transition-all shadow-lg shadow-orange-500/20 flex items-center gap-1.5 cursor-pointer hover:scale-105"
+                    >
+                      <Car className="w-3.5 h-3.5" />
+                      <span>Book Online</span>
+                    </button>
+                    <a
+                      href="tel:8507067716"
+                      className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10 flex items-center justify-center"
+                      title="Call to Reserve"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-orange-400" />
+                    </a>
+                  </div>
                 </div>
               </div>
             </motion.div>

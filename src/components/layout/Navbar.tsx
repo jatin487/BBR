@@ -84,7 +84,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'locations', label: 'Dehradun Hubs' },
     { id: 'offers', label: 'Offers' },
     { id: 'contact', label: 'Contact' },
+    { id: 'admin', label: '⚙ Admin' },
   ];
+
 
   const isKycVerified = user?.kyc?.status === 'verified';
 

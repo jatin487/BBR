@@ -17,8 +17,10 @@ import { CabShowcase } from './components/cabs/CabShowcase';
 import { VehicleListing } from './components/vehicles/VehicleListing';
 import { VehicleDetailsModal } from './components/vehicles/VehicleDetailsModal';
 import { BookingModal } from './components/booking/BookingModal';
+import { TaxiBookingModal } from './components/booking/TaxiBookingModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { DigiLockerModal } from './components/booking/DigiLockerModal';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 import { UserProfileBanner } from './components/auth/UserProfileBanner';
 import {
   firebaseAuthService,
@@ -30,7 +32,7 @@ import {
   VerifiedKycData
 } from './lib/firebase';
 
-import { Vehicle, RateType, VehicleCategory } from './types';
+import { Vehicle, RateType, VehicleCategory, CabVehicle, CabPackage } from './types';
 import { VEHICLES } from './data/vehicles';
 import {
   Bike,
@@ -63,12 +65,27 @@ const AppContent: React.FC = () => {
   const [bookingRateType, setBookingRateType] = useState<RateType>('fullday');
   const [bookingDuration, setBookingDuration] = useState(1);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isTaxiBookingOpen, setIsTaxiBookingOpen] = useState(false);
+  const [selectedTaxiCab, setSelectedTaxiCab] = useState<CabVehicle | null>(null);
+  const [selectedTaxiPackage, setSelectedTaxiPackage] = useState<CabPackage | null>(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [pendingBooking, setPendingBooking] = useState<{
     vehicle: Vehicle;
     rateType: RateType;
     duration: number;
   } | null>(null);
+
+  const handleBookCab = (cab?: CabVehicle) => {
+    setSelectedTaxiCab(cab || null);
+    setSelectedTaxiPackage(null);
+    setIsTaxiBookingOpen(true);
+  };
+
+  const handleBookPackage = (pkg: CabPackage) => {
+    setSelectedTaxiPackage(pkg);
+    setSelectedTaxiCab(null);
+    setIsTaxiBookingOpen(true);
+  };
 
   // Sync Firebase Auth state — use ONLY real user data, no hardcoded fallbacks
   useEffect(() => {
@@ -263,7 +280,10 @@ const AppContent: React.FC = () => {
             />
 
             {/* Uttarakhand Rental Cabs & Outstation Taxi Services */}
-            <CabShowcase />
+            <CabShowcase
+              onBookCab={handleBookCab}
+              onBookPackage={handleBookPackage}
+            />
 
 
 
@@ -346,8 +366,16 @@ const AppContent: React.FC = () => {
         {/* VIEW: RENTAL CABS & OUTSTATION TAXIS */}
         {currentTab === 'cabs' && (
           <div className="py-8">
-            <CabShowcase />
+            <CabShowcase
+              onBookCab={handleBookCab}
+              onBookPackage={handleBookPackage}
+            />
           </div>
+        )}
+
+        {/* VIEW: ADMIN DASHBOARD (hidden tab, accessed via footer or secret nav) */}
+        {currentTab === 'admin' && (
+          <AdminDashboard onClose={() => setCurrentTab('home')} />
         )}
 
         {/* VIEW 5: LOCATIONS */}
@@ -486,6 +514,17 @@ const AppContent: React.FC = () => {
         initialRateType={bookingRateType}
         initialCity={selectedCity}
         initialDuration={bookingDuration}
+      />
+
+      <TaxiBookingModal
+        isOpen={isTaxiBookingOpen}
+        onClose={() => {
+          setIsTaxiBookingOpen(false);
+          setSelectedTaxiCab(null);
+          setSelectedTaxiPackage(null);
+        }}
+        initialCab={selectedTaxiCab}
+        initialPackage={selectedTaxiPackage}
       />
 
       <AuthModal

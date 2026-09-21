@@ -225,6 +225,11 @@ export const Footer: React.FC<FooterProps> = ({
                   24/7 Roadside Assistance
                 </button>
               </li>
+              <li>
+                <button onClick={() => onNavigate('admin')} className="hover:text-orange-400 transition-colors" style={{ color: '#656C70' }}>
+                  ⚙ Admin Dashboard
+                </button>
+              </li>
             </ul>
           </div>
         </div>
