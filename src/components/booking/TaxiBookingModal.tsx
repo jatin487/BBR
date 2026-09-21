@@ -153,7 +153,7 @@ export const TaxiBookingModal: React.FC<TaxiBookingModalProps> = ({
     let confirmedId = newId;
 
     try {
-      const res = await fetch('/api/bookings/taxi', {
+      const res = await fetch('/api/bookings/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

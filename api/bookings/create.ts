@@ -9,30 +9,44 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   const booking = req.body;
 
-  if (!booking || !booking.userId || !booking.vehicleId || !booking.customerPhone) {
-    return res.status(400).json({ message: 'Missing booking information' });
+  if (!booking || !booking.customerPhone) {
+    return res.status(400).json({ message: 'Missing required customer phone number' });
   }
 
+  const isTaxi = booking.type === 'taxi';
+  const prefix = isTaxi ? 'TAXI' : 'BBR';
+
   const savedBooking = saveBooking({
-    id: `BBR-${Math.floor(100000 + Math.random() * 900000)}`,
-    userId: booking.userId,
-    vehicleId: booking.vehicleId,
-    vehicleName: booking.vehicleName,
-    city: booking.city,
-    pickupHub: booking.pickupHub,
-    dropHub: booking.dropHub,
+    id: `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`,
+    type: booking.type || 'bike',
+    userId: booking.userId || 'guest',
+    vehicleId: booking.vehicleId || (isTaxi ? 'taxi' : ''),
+    vehicleName: booking.vehicleName || (isTaxi ? 'Taxi' : 'Vehicle'),
+    city: booking.city || 'Dehradun',
+    pickupHub: booking.pickupHub || booking.pickupAddress || '',
+    dropHub: booking.dropHub || booking.dropAddress || '',
+    pickupAddress: booking.pickupAddress,
+    dropAddress: booking.dropAddress,
     pickupDate: booking.pickupDate,
     pickupTime: booking.pickupTime,
-    returnDate: booking.returnDate,
-    returnTime: booking.returnTime,
-    rateType: booking.rateType,
-    duration: booking.duration,
-    totalAmount: booking.totalAmount,
-    customerName: booking.customerName,
+    returnDate: booking.returnDate || booking.pickupDate,
+    returnTime: booking.returnTime || booking.pickupTime,
+    rateType: booking.rateType || (isTaxi ? 'taxi' : 'fullday'),
+    duration: booking.duration || 1,
+    totalAmount: booking.totalAmount || booking.estimatedFare || 0,
+    estimatedFare: booking.estimatedFare,
+    estimatedDistance: booking.estimatedDistance,
+    customerName: booking.customerName || '',
     customerPhone: booking.customerPhone,
-    paymentMethod: booking.paymentMethod,
+    customerEmail: booking.customerEmail || '',
+    passengerCount: booking.passengerCount || 1,
+    specialInstructions: booking.specialInstructions || '',
+    driverName: booking.driverName || '',
+    driverPhone: booking.driverPhone || '',
+    driverVehicle: booking.driverVehicle || '',
+    paymentMethod: booking.paymentMethod || 'cash',
     createdAt: new Date().toISOString(),
-    status: 'confirmed'
+    status: 'confirmed',
   });
 
   return res.status(200).json({ success: true, booking: savedBooking });
