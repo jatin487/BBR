@@ -3,8 +3,9 @@ import {
   ShieldCheck, RefreshCw, Car, Bike, Users, Banknote, TrendingUp,
   MapPin, Phone, Mail, Clock, Calendar, ChevronDown, ChevronUp,
   CheckCircle, XCircle, Loader2, Navigation, Eye, Filter, Search,
-  AlertTriangle, Sparkles, X, Download
+  AlertTriangle, Sparkles, X, Download, MessageSquare
 } from 'lucide-react';
+import { WhatsAppCatalogue } from './WhatsAppCatalogue';
 
 const ADMIN_TOKEN = 'bbr-admin-2024'; // must match api/admin/bookings.ts
 
@@ -75,6 +76,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [filterType, setFilterType] = useState<'all' | 'bike' | 'taxi'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'confirmed' | 'pending' | 'cancelled' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeAdminTab, setActiveAdminTab] = useState<'whatsapp' | 'bookings'>('whatsapp');
 
   const computeStats = (list: Booking[]): Stats => {
     const s: Stats = {
@@ -365,7 +367,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
       <div className="px-4 sm:px-6 py-6 space-y-6 max-w-7xl mx-auto">
 
-        {/* ── Stats Cards ── */}
+        {/* ── View Switcher: WhatsApp Catalogue vs Bookings List ── */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-white/[0.08]">
+          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+            <button
+              onClick={() => setActiveAdminTab('whatsapp')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeAdminTab === 'whatsapp'
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span>📲 WhatsApp Fleet Catalogue & Stock</span>
+            </button>
+            <button
+              onClick={() => setActiveAdminTab('bookings')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeAdminTab === 'bookings'
+                  ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Eye className="w-4 h-4" />
+              <span>📋 Bookings & Dispatches ({bookings.length})</span>
+            </button>
+          </div>
+
+          <div className="text-xs text-slate-400 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-emerald-400 font-medium">Zero Security Deposit Policy Active</span>
+          </div>
+        </div>
+
+        {activeAdminTab === 'whatsapp' ? (
+          <WhatsAppCatalogue
+            bookings={bookings}
+            onUpdateBookingStatus={handleUpdateStatus}
+          />
+        ) : (
+          <div className="space-y-6">
+            {/* ── Stats Cards ── */}
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {[
@@ -717,6 +759,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 </div>
               );
             })}
+          </div>
+        )}
           </div>
         )}
       </div>

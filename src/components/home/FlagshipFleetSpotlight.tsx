@@ -336,10 +336,10 @@ export const FlagshipFleetSpotlight: React.FC<FlagshipFleetSpotlightProps> = ({
               <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-3">
                 <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-semibold mb-1">
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Deposit</span>
+                  <span>Security Deposit</span>
                 </div>
-                <p className="text-base font-black text-white font-mono">₹{currentVehicle.securityDeposit}</p>
-                <p className="text-[10px] text-slate-400">100% Refundable</p>
+                <p className="text-base font-black text-emerald-400 font-mono">₹0</p>
+                <p className="text-[10px] text-emerald-400/80">Zero Deposit Rental</p>
               </div>
             </div>
 

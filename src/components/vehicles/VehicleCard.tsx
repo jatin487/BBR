@@ -184,9 +184,9 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
                 <span className="text-2xl font-black" style={{ color: '#F4F5F2' }}>₹{activePrice.amount}</span>
                 <span className="text-xs font-medium" style={{ color: '#656C70' }}>{activePrice.unit}</span>
               </div>
-              <div className="text-[10px] flex items-center gap-1 mt-0.5" style={{ color: '#656C70' }}>
+              <div className="text-[10px] flex items-center gap-1 mt-0.5" style={{ color: '#34d399' }}>
                 <Shield className="w-3 h-3" style={{ color: '#34d399' }} />
-                <span>Security Deposit: ₹{vehicle.securityDeposit}</span>
+                <span className="font-semibold">Zero Security Deposit</span>
               </div>
             </div>
 

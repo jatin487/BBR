@@ -45,7 +45,7 @@ export const VehicleDetailsModal: React.FC<VehicleDetailsModalProps> = ({
   const baseRate = getBaseRate();
   const subtotal = baseRate * durationUnits;
   const gst = Math.round(subtotal * 0.18);
-  const deposit = vehicle.securityDeposit;
+  const deposit = 0; // Zero security deposit policy
   const totalPayable = subtotal + gst;
 
   return (
@@ -256,17 +256,17 @@ export const VehicleDetailsModal: React.FC<VehicleDetailsModalProps> = ({
                   </div>
                   <div className="flex justify-between text-emerald-400 border-t border-white/5 pt-2">
                     <span className="flex items-center gap-1">
-                      <Shield className="w-3.5 h-3.5" /> Refundable Security Deposit:
+                      <Shield className="w-3.5 h-3.5" /> Security Deposit:
                     </span>
-                    <span className="font-bold">₹{deposit}</span>
+                    <span className="font-bold bg-emerald-500/10 px-2 py-0.5 rounded text-xs border border-emerald-500/20">₹0 (Zero Deposit Policy)</span>
                   </div>
                   <div className="flex justify-between items-baseline border-t border-white/10 pt-3 text-sm">
                     <div>
                       <span className="font-bold text-white">Total Payable Now:</span>
-                      <p className="text-[10px] text-slate-400">Deposit is 100% refunded at return</p>
+                      <p className="text-[10px] text-emerald-400">100% Zero Deposit Guaranteed</p>
                     </div>
                     <span className="text-xl font-black text-orange-400 font-heading">
-                      ₹{totalPayable + deposit}
+                      ₹{totalPayable}
                     </span>
                   </div>
                 </div>

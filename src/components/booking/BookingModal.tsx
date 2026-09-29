@@ -144,8 +144,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   const taxableAmount = Math.max(0, subtotal + extrasCost - discount);
   const gst = Math.round(taxableAmount * 0.18);
-  const deposit = vehicle.securityDeposit;
-  const totalAmountToPay = taxableAmount + gst + deposit;
+  const deposit = 0; // Zero Security Deposit policy for bike & scooty rentals
+  const totalAmountToPay = taxableAmount + gst;
 
   const handleApplyPromo = () => {
     const found = OFFERS.find((o) => o.code.toUpperCase() === promoCodeInput.trim().toUpperCase());
@@ -318,7 +318,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <div className="text-xs text-slate-300 mt-2 flex flex-wrap gap-3 justify-center sm:justify-start">
                     <span>⚡ {vehicle.engineCC} cc</span>
                     <span>⛽ {vehicle.mileage}</span>
-                    <span>🛡️ Deposit: ₹{vehicle.securityDeposit}</span>
+                    <span className="text-emerald-400 font-bold">🛡️ Zero Security Deposit</span>
                   </div>
                 </div>
               </div>
@@ -733,11 +733,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <span>₹{gst}</span>
                 </div>
                 <div className="flex justify-between text-emerald-400 border-t border-white/5 pt-2 font-bold">
-                  <span>Refundable Security Deposit:</span>
-                  <span>₹{deposit}</span>
+                  <span>Security Deposit:</span>
+                  <span className="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-xs border border-emerald-500/20">₹0 (Waived)</span>
                 </div>
                 <div className="flex justify-between items-baseline border-t border-white/10 pt-2 text-sm font-black text-white">
-                  <span>Grand Total (With Deposit):</span>
+                  <span>Grand Total:</span>
                   <span className="text-xl text-orange-400">₹{totalAmountToPay}</span>
                 </div>
               </div>
@@ -806,8 +806,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     <p className="font-bold text-slate-200">{pickupDate} @ {pickupTime}</p>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-[10px] uppercase font-semibold">Total Paid / Due</span>
-                    <p className="font-bold text-orange-400">₹{totalAmountToPay} (incl. deposit)</p>
+                    <span className="text-slate-500 text-[10px] uppercase font-semibold">Total Amount Due</span>
+                    <p className="font-bold text-orange-400">₹{totalAmountToPay} (Zero Deposit)</p>
                   </div>
                   <div>
                     <span className="text-slate-500 text-[10px] uppercase font-semibold">Emergency Helpline</span>
