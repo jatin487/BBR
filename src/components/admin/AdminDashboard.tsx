@@ -323,94 +323,53 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
   // ── Main Dashboard ─────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-[9998] overflow-y-auto" style={{ backgroundColor: '#0A0A0A' }}>
+    <div className="fixed inset-0 z-[9998] flex flex-col" style={{ backgroundColor: '#0A0A0A' }}>
       {/* Top Bar */}
-      <div className="sticky top-0 z-10 px-4 sm:px-6 py-4 flex items-center justify-between" style={{ background: 'rgba(10,10,10,0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,106,0,0.12)' }}>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,106,0,0.12)', border: '1px solid rgba(255,106,0,0.3)' }}>
-            <ShieldCheck className="w-4.5 h-4.5" style={{ color: '#FF6A00' }} />
+      <div className="flex-shrink-0 z-10 px-3 sm:px-6 py-3 flex items-center justify-between" style={{ background: 'rgba(10,10,10,0.95)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,106,0,0.12)' }}>
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(255,106,0,0.12)', border: '1px solid rgba(255,106,0,0.3)' }}>
+            <ShieldCheck className="w-4 h-4" style={{ color: '#FF6A00' }} />
           </div>
           <div>
-            <h1 className="text-sm font-black text-white">BBR Admin Dashboard</h1>
-            <p className="text-[10px]" style={{ color: '#656C70' }}>
-              {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Loading…'} · Auto-refreshes every 15s
+            <h1 className="text-sm font-black text-white leading-tight">BBR Admin</h1>
+            <p className="text-[9px] leading-tight" style={{ color: '#656C70' }}>
+              {lastUpdated ? lastUpdated.toLocaleTimeString() : 'Loading…'}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={exportCSV}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
             style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e' }}
-            title="Download all filtered bookings as CSV"
+            title="Export CSV"
           >
             <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Export CSV</span>
+            <span className="hidden sm:inline">CSV</span>
           </button>
           <button
             onClick={fetchBookings}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
             style={{ background: 'rgba(255,106,0,0.1)', border: '1px solid rgba(255,106,0,0.2)', color: '#FF8C33' }}
+            title="Refresh"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
           </button>
           <button
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            className="flex items-center justify-center w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#9BA1A5' }}
+            title="Exit"
           >
-            <X className="w-3.5 h-3.5" />Exit
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <div className="px-4 sm:px-6 py-6 space-y-6 max-w-7xl mx-auto">
-
-        {/* ── View Switcher: WhatsApp Catalogue vs Bookings List ── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-white/[0.08]">
-          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
-            <button
-              onClick={() => setActiveAdminTab('whatsapp')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeAdminTab === 'whatsapp'
-                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>📲 WhatsApp Fleet Catalogue & Stock</span>
-            </button>
-            <button
-              onClick={() => setActiveAdminTab('bookings')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeAdminTab === 'bookings'
-                  ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/30'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Eye className="w-4 h-4" />
-              <span>📋 Bookings & Dispatches ({bookings.length})</span>
-            </button>
-            <button
-              onClick={() => setActiveAdminTab('security')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeAdminTab === 'security'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>🛡️ Security & App Check Audit</span>
-            </button>
-          </div>
-
-          <div className="text-xs text-slate-400 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-emerald-400 font-medium">Zero Security Deposit Policy Active</span>
-          </div>
-        </div>
+      {/* Scrollable content area — leaves room for bottom nav */}
+      <div className="flex-1 overflow-y-auto pb-20" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <div className="px-3 sm:px-6 py-4 space-y-4 max-w-7xl mx-auto">
 
         {activeAdminTab === 'whatsapp' ? (
           <WhatsAppCatalogue
@@ -420,6 +379,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         ) : activeAdminTab === 'security' ? (
           <SecurityStatusPanel />
         ) : (
+          <>
+          {/* Zero-deposit badge — visible at top of bookings tab */}
+          <div className="flex items-center gap-2 text-xs mb-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-emerald-400 font-medium">Zero Security Deposit Policy Active</span>
+          </div>
           <div className="space-y-6">
             {/* ── Stats Cards ── */}
         {stats && (
@@ -443,24 +408,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         )}
 
         {/* ── Filters & Search ── */}
-        <div className="flex flex-wrap gap-3 items-center">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <Search className="w-3.5 h-3.5" style={{ color: '#656C70' }} />
+        <div className="space-y-2">
+          {/* Full-width search */}
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl w-full" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#656C70' }} />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name, phone, ID, address…"
-              className="bg-transparent text-sm text-white placeholder-gray-600 outline-none w-56"
+              placeholder="Search name, phone, ID, address…"
+              className="bg-transparent text-sm text-white placeholder-gray-600 outline-none flex-1 min-w-0"
             />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} style={{ color: '#656C70' }}>
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-          <div className="flex items-center gap-1">
-            <Filter className="w-3.5 h-3.5 mr-1" style={{ color: '#656C70' }} />
+          {/* Horizontally scrollable filter chips */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            <Filter className="w-3.5 h-3.5 flex-shrink-0 self-center" style={{ color: '#656C70' }} />
             {(['all', 'taxi', 'bike'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setFilterType(t)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-all"
+                className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-all"
                 style={{
                   background: filterType === t ? 'rgba(255,106,0,0.15)' : 'rgba(255,255,255,0.04)',
                   border: `1px solid ${filterType === t ? 'rgba(255,106,0,0.35)' : 'rgba(255,255,255,0.07)'}`,
@@ -470,13 +442,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                 {t === 'all' ? 'All' : t === 'taxi' ? '🚖 Taxi' : '🏍 Bike'}
               </button>
             ))}
-          </div>
-          <div className="flex items-center gap-1">
+            <div className="w-px flex-shrink-0 self-stretch" style={{ background: 'rgba(255,255,255,0.08)' }} />
             {(['all', 'confirmed', 'pending', 'cancelled', 'completed'] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setFilterStatus(s)}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-all"
+                className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold capitalize transition-all"
                 style={{
                   background: filterStatus === s ? 'rgba(255,106,0,0.1)' : 'rgba(255,255,255,0.03)',
                   border: `1px solid ${filterStatus === s ? 'rgba(255,106,0,0.25)' : 'rgba(255,255,255,0.06)'}`,
@@ -559,10 +530,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                       </div>
                     </div>
 
-                    {/* Amount + Date */}
-                    <div className="text-right flex-shrink-0 hidden sm:block">
-                      <p className="text-base font-black" style={{ color: '#FF6A00' }}>₹{(booking.totalAmount || booking.estimatedFare || 0).toLocaleString()}</p>
-                      <p className="text-[10px]" style={{ color: '#656C70' }}>{new Date(booking.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                    {/* Amount + Date — always visible */}
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-black" style={{ color: '#FF6A00' }}>₹{(booking.totalAmount || booking.estimatedFare || 0).toLocaleString()}</p>
+                      <p className="text-[9px]" style={{ color: '#656C70' }}>{new Date(booking.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
 
                     {/* Expand icon */}
@@ -776,7 +747,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           </div>
         )}
           </div>
+          </>
         )}
+      </div>
+      </div>
+
+      {/* ── Sticky Bottom Navigation (Mobile-first) ── */}
+      <div
+        className="flex-shrink-0 flex items-stretch border-t"
+        style={{
+          background: 'rgba(10,10,10,0.98)',
+          backdropFilter: 'blur(20px)',
+          borderColor: 'rgba(255,255,255,0.08)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
+      >
+        <button
+          onClick={() => { setActiveAdminTab('whatsapp'); fetchBookings(); }}
+          className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all cursor-pointer"
+          style={{ color: activeAdminTab === 'whatsapp' ? '#10b981' : '#656C70' }}
+        >
+          <MessageSquare className="w-5 h-5" />
+          <span className="text-[10px] font-bold">Catalogue</span>
+        </button>
+        <button
+          onClick={() => { setActiveAdminTab('bookings'); fetchBookings(); }}
+          className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all cursor-pointer relative"
+          style={{ color: activeAdminTab === 'bookings' ? '#FF6A00' : '#656C70' }}
+        >
+          <div className="relative">
+            <Eye className="w-5 h-5" />
+            {bookings.length > 0 && (
+              <span
+                className="absolute -top-1.5 -right-2 text-[9px] font-black px-1 rounded-full"
+                style={{ background: '#FF6A00', color: '#fff', minWidth: '14px', lineHeight: '14px', textAlign: 'center' }}
+              >
+                {bookings.length}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] font-bold">Bookings</span>
+        </button>
+        <button
+          onClick={() => setActiveAdminTab('security')}
+          className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all cursor-pointer"
+          style={{ color: activeAdminTab === 'security' ? '#3b82f6' : '#656C70' }}
+        >
+          <ShieldCheck className="w-5 h-5" />
+          <span className="text-[10px] font-bold">Security</span>
+        </button>
       </div>
     </div>
   );
