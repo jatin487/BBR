@@ -6,6 +6,7 @@ import {
   AlertTriangle, Sparkles, X, Download, MessageSquare
 } from 'lucide-react';
 import { WhatsAppCatalogue } from './WhatsAppCatalogue';
+import { SecurityStatusPanel } from './SecurityStatusPanel';
 
 const ADMIN_TOKEN = 'bbr-admin-2024'; // must match api/admin/bookings.ts
 
@@ -76,7 +77,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [filterType, setFilterType] = useState<'all' | 'bike' | 'taxi'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'confirmed' | 'pending' | 'cancelled' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeAdminTab, setActiveAdminTab] = useState<'whatsapp' | 'bookings'>('whatsapp');
+  const [activeAdminTab, setActiveAdminTab] = useState<'whatsapp' | 'bookings' | 'security'>('whatsapp');
 
   const computeStats = (list: Booking[]): Stats => {
     const s: Stats = {
@@ -392,6 +393,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
               <Eye className="w-4 h-4" />
               <span>📋 Bookings & Dispatches ({bookings.length})</span>
             </button>
+            <button
+              onClick={() => setActiveAdminTab('security')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeAdminTab === 'security'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>🛡️ Security & App Check Audit</span>
+            </button>
           </div>
 
           <div className="text-xs text-slate-400 flex items-center gap-2">
@@ -405,6 +417,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
             bookings={bookings}
             onUpdateBookingStatus={handleUpdateStatus}
           />
+        ) : activeAdminTab === 'security' ? (
+          <SecurityStatusPanel />
         ) : (
           <div className="space-y-6">
             {/* ── Stats Cards ── */}

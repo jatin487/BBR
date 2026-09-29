@@ -5,13 +5,19 @@ import {
   Auth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   RecaptchaVerifier,
   signInWithPhoneNumber,
   signOut,
   onAuthStateChanged,
   ConfirmationResult,
-  User as FirebaseUser
+  User as FirebaseUser,
 } from 'firebase/auth';
+import { initAppCheck, getAppCheckState } from './appCheck';
+import { logSecurityEvent } from './securityLogger';
+import { checkRateLimit, recordAttempt } from './rateLimiter';
 
 // Verified KYC document data structure
 export interface VerifiedKycData {
@@ -34,19 +40,28 @@ export interface UserProfile {
   phone: string;
   email?: string;
   photoURL?: string;
-  authProvider: 'phone' | 'google';
+  authProvider: 'phone' | 'google' | 'email';
   kyc?: VerifiedKycData | null;
 }
 
-// ── Firebase Config (Official App: login-9f3fd) ──────────────────────────────
+// ── Environment Identification ───────────────────────────────────────────────
+export const ENVIRONMENT = import.meta.env.VITE_APP_ENV || (import.meta.env.DEV ? 'development' : 'production');
+export const IS_SECURITY_TESTING = import.meta.env.VITE_SECURITY_TESTING_MODE === 'true';
+
+// ── Firebase Config ──────────────────────────────────────────────────────────
+// In testing mode, ensure test configuration cannot point to production by enforcing test project ID
+const targetProjectId = IS_SECURITY_TESTING
+  ? import.meta.env.VITE_TEST_FIREBASE_PROJECT_ID || 'bbr-security-testing'
+  : import.meta.env.VITE_FIREBASE_PROJECT_ID || 'login-9f3fd';
+
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            || 'AIzaSyDbterQhAJSJCUaiJt033ytsQDLns2Zl-Y',
   authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        || 'login-9f3fd.firebaseapp.com',
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         || 'login-9f3fd',
+  projectId:         targetProjectId,
   storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET     || 'login-9f3fd.firebasestorage.app',
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID|| '738858214140',
   appId:             import.meta.env.VITE_FIREBASE_APP_ID             || '1:738858214140:web:525e35e1bb346c35d1ed79',
-  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID     || 'G-KDEWP405R4'
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID     || 'G-KDEWP405R4',
 };
 
 export const hasFirebaseConfig = Boolean(
@@ -63,6 +78,10 @@ if (hasFirebaseConfig) {
   try {
     app  = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     auth = getAuth(app);
+
+    // Initialize App Check with metrics/monitoring mode
+    initAppCheck(app);
+
     if (typeof window !== 'undefined') {
       isSupported()
         .then((supported) => {
@@ -88,6 +107,57 @@ const LEGACY_USER_KEY  = 'bbr-user';
 
 /** Returns the UID-scoped KYC key so User A's KYC never leaks to User B */
 const kycKey = (uid: string) => `bbr-kyc-${uid}`;
+
+// ── Generic Error Handler (Enumeration Protection) ───────────────────────────
+/**
+ * Maps specific internal Firebase Auth errors to generic, safe customer-facing messages.
+ * Prevents account and email enumeration attacks.
+ */
+export function getGenericAuthErrorMessage(error: unknown): string {
+  if (!error || typeof error !== 'object') {
+    return 'An authentication error occurred. Please try again.';
+  }
+
+  const code = (error as { code?: string }).code || '';
+
+  // Enumeration defense: map user-not-found, wrong-password, invalid-credential, invalid-email
+  if (
+    code === 'auth/invalid-credential' ||
+    code === 'auth/invalid-login-credentials' ||
+    code === 'auth/user-not-found' ||
+    code === 'auth/wrong-password' ||
+    code === 'auth/user-disabled' ||
+    code === 'auth/invalid-email'
+  ) {
+    return 'Invalid login credentials. Please check your details and try again.';
+  }
+
+  if (code === 'auth/email-already-in-use') {
+    return 'An account with this email address already exists. Please sign in instead.';
+  }
+
+  if (code === 'auth/weak-password') {
+    return 'Password should be at least 8 characters long and contain numbers and symbols.';
+  }
+
+  if (code === 'auth/too-many-requests') {
+    return 'Too many failed login attempts. Access is temporarily restricted. Please wait a moment.';
+  }
+
+  if (code === 'auth/invalid-verification-code' || code === 'auth/code-expired') {
+    return 'Invalid or expired OTP code. Please request a new verification code.';
+  }
+
+  if (code === 'auth/app-check-token-invalid') {
+    return 'Security verification (App Check) could not be completed. Please refresh the page.';
+  }
+
+  if (code === 'auth/popup-closed-by-user') {
+    return 'Sign-in cancelled. Popup was closed before completion.';
+  }
+
+  return 'Authentication failed. Please verify your information and try again.';
+}
 
 // ── Session Helpers ───────────────────────────────────────────────────────────
 export const saveUserSession = (profile: UserProfile): void => {
@@ -123,7 +193,6 @@ export const loadUserSession = (): UserProfile | null => {
  */
 export const clearUserSession = (uid?: string): void => {
   try {
-    // Get the UID from the current session if not passed
     const sessionUid = uid || (() => {
       try {
         const raw = localStorage.getItem(USER_SESSION_KEY);
@@ -181,41 +250,216 @@ export const clearUserKyc = (uid?: string): void => {
   } catch { /* ignore */ }
 };
 
+// ── Secure Token Handling ─────────────────────────────────────────────────────
+/**
+ * Safely inspects and refreshes the user's ID token.
+ * Gracefully handles token expiration, revocation, or account disabling.
+ */
+export async function getVerifiedIdToken(forceRefresh = false): Promise<string | null> {
+  if (!auth || !auth.currentUser) return null;
+
+  try {
+    const token = await auth.currentUser.getIdToken(forceRefresh);
+    return token;
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code;
+    if (
+      code === 'auth/user-token-expired' ||
+      code === 'auth/id-token-expired' ||
+      code === 'auth/id-token-revoked' ||
+      code === 'auth/user-disabled'
+    ) {
+      logSecurityEvent('AUTH_TOKEN_EXPIRED', 'warn', {
+        userId: auth.currentUser.uid,
+        details: { code, message: 'User token expired or revoked. Safely clearing local session.' },
+      });
+      await firebaseAuthService.signOut();
+    }
+    return null;
+  }
+}
+
 // ── Auth Service ──────────────────────────────────────────────────────────────
 export const firebaseAuthService = {
 
   /**
-   * Google Sign-In via Firebase popup.
-   * Uses ONLY the real Firebase user — no hardcoded fallback identities.
+   * Google Sign-In via Firebase popup with progressive rate limiting and event logging.
    */
   async signInWithGoogle(): Promise<UserProfile> {
+    const rateLimitKey = 'auth:google_popup';
+    const rateStatus = checkRateLimit(rateLimitKey);
+    if (rateStatus.isBlocked) {
+      throw new Error(
+        `Too many rapid login attempts. Please wait ${rateStatus.remainingSeconds}s before trying again.`
+      );
+    }
+
     if (!auth || !hasFirebaseConfig) {
       throw new Error(
         'Firebase is not configured. Please add your VITE_FIREBASE_* credentials to the .env file to enable Google Sign-In.'
       );
     }
 
-    const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
-    const result = await signInWithPopup(auth, provider);
-    const fbUser = result.user;
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await signInWithPopup(auth, provider);
+      const fbUser = result.user;
 
-    // Use email prefix as name fallback if displayName is absent
-    const nameFromEmail = fbUser.email ? fbUser.email.split('@')[0].replace(/[._]/g, ' ') : '';
-    const resolvedName  = fbUser.displayName || nameFromEmail || 'Google User';
+      const nameFromEmail = fbUser.email ? fbUser.email.split('@')[0].replace(/[._]/g, ' ') : '';
+      const resolvedName  = fbUser.displayName || nameFromEmail || 'Google User';
 
-    const profile: UserProfile = {
-      uid:          fbUser.uid,
-      name:         resolvedName,
-      email:        fbUser.email  || undefined,
-      phone:        fbUser.phoneNumber || '',
-      photoURL:     fbUser.photoURL    || undefined,
-      authProvider: 'google',
-      kyc:          loadUserKyc(fbUser.uid)
-    };
+      const profile: UserProfile = {
+        uid:          fbUser.uid,
+        name:         resolvedName,
+        email:        fbUser.email  || undefined,
+        phone:        fbUser.phoneNumber || '',
+        photoURL:     fbUser.photoURL    || undefined,
+        authProvider: 'google',
+        kyc:          loadUserKyc(fbUser.uid),
+      };
 
-    saveUserSession(profile);
-    return profile;
+      saveUserSession(profile);
+      recordAttempt(rateLimitKey, true, fbUser.uid);
+
+      logSecurityEvent('AUTH_LOGIN_SUCCESS', 'success', {
+        userId: fbUser.uid,
+        appCheckStatus: getAppCheckState().mode,
+        details: { provider: 'google', emailDomain: fbUser.email?.split('@')[1] },
+      });
+
+      return profile;
+    } catch (error) {
+      recordAttempt(rateLimitKey, false);
+      logSecurityEvent('AUTH_LOGIN_FAILURE', 'failure', {
+        details: { provider: 'google', reason: (error as Error).message },
+      });
+      throw new Error(getGenericAuthErrorMessage(error));
+    }
+  },
+
+  /**
+   * Email & Password Sign-In with progressive rate-limiting & enumeration protection.
+   */
+  async signInWithEmail(email: string, pass: string): Promise<UserProfile> {
+    const cleanEmail = email.trim().toLowerCase();
+    const rateLimitKey = `auth:email:${cleanEmail}`;
+    const rateStatus = checkRateLimit(rateLimitKey);
+
+    if (rateStatus.isBlocked) {
+      logSecurityEvent('RATE_LIMIT_TRIGGERED', 'rate_limited', {
+        userId: cleanEmail,
+        details: { cooldownSeconds: rateStatus.remainingSeconds },
+      });
+      throw new Error(
+        `Too many failed login attempts. Please wait ${rateStatus.remainingSeconds}s before retrying.`
+      );
+    }
+
+    if (!auth || !hasFirebaseConfig) {
+      throw new Error('Authentication is currently not configured on this system.');
+    }
+
+    try {
+      const result = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+      const fbUser = result.user;
+
+      const profile: UserProfile = {
+        uid: fbUser.uid,
+        name: fbUser.displayName || cleanEmail.split('@')[0],
+        email: fbUser.email || cleanEmail,
+        phone: fbUser.phoneNumber || '',
+        authProvider: 'email',
+        kyc: loadUserKyc(fbUser.uid),
+      };
+
+      saveUserSession(profile);
+      recordAttempt(rateLimitKey, true, fbUser.uid);
+
+      logSecurityEvent('AUTH_LOGIN_SUCCESS', 'success', {
+        userId: fbUser.uid,
+        details: { provider: 'email' },
+      });
+
+      return profile;
+    } catch (error) {
+      const state = recordAttempt(rateLimitKey, false, cleanEmail);
+
+      logSecurityEvent('AUTH_LOGIN_FAILURE', 'failure', {
+        userId: cleanEmail,
+        details: { provider: 'email', consecutiveFailures: state.attempts },
+      });
+
+      throw new Error(getGenericAuthErrorMessage(error));
+    }
+  },
+
+  /**
+   * Email & Password Sign-Up with password strength validation.
+   */
+  async signUpWithEmail(email: string, pass: string, name?: string): Promise<UserProfile> {
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (pass.length < 8) {
+      throw new Error('Password must be at least 8 characters long.');
+    }
+
+    if (!auth || !hasFirebaseConfig) {
+      throw new Error('Authentication service is not configured.');
+    }
+
+    try {
+      const result = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+      const fbUser = result.user;
+
+      const profile: UserProfile = {
+        uid: fbUser.uid,
+        name: name?.trim() || cleanEmail.split('@')[0],
+        email: fbUser.email || cleanEmail,
+        phone: '',
+        authProvider: 'email',
+        kyc: null,
+      };
+
+      saveUserSession(profile);
+
+      logSecurityEvent('AUTH_LOGIN_SUCCESS', 'success', {
+        userId: fbUser.uid,
+        details: { provider: 'email_signup' },
+      });
+
+      return profile;
+    } catch (error) {
+      logSecurityEvent('AUTH_LOGIN_FAILURE', 'failure', {
+        userId: cleanEmail,
+        details: { provider: 'email_signup' },
+      });
+      throw new Error(getGenericAuthErrorMessage(error));
+    }
+  },
+
+  /**
+   * Password Reset Email with generic confirmation to prevent user enumeration.
+   */
+  async sendPasswordReset(email: string): Promise<void> {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!auth || !hasFirebaseConfig) {
+      throw new Error('Authentication service is not configured.');
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, cleanEmail);
+      logSecurityEvent('AUTH_GENERIC_ERROR', 'info', {
+        userId: cleanEmail,
+        details: { action: 'password_reset_sent' },
+      });
+    } catch (_error) {
+      // Intentionally suppress user-not-found error to avoid leaking email existence
+      logSecurityEvent('AUTH_GENERIC_ERROR', 'info', {
+        userId: cleanEmail,
+        details: { action: 'password_reset_attempted' },
+      });
+    }
   },
 
   /** Create invisible reCAPTCHA verifier for Phone OTP */
@@ -224,8 +468,16 @@ export const firebaseAuthService = {
     try {
       return new RecaptchaVerifier(auth, containerId, {
         size: 'invisible',
-        callback: () => {},
-        'expired-callback': () => console.warn('[reCAPTCHA] Expired')
+        callback: () => {
+          logSecurityEvent('APPCHECK_VERIFICATION', 'info', {
+            details: { mechanism: 'recaptcha_verifier_executed' },
+          });
+        },
+        'expired-callback': () => {
+          logSecurityEvent('APPCHECK_VERIFICATION', 'warn', {
+            details: { mechanism: 'recaptcha_verifier_expired' },
+          });
+        },
       });
     } catch (err) {
       console.warn('[reCAPTCHA] Setup error:', err);
@@ -234,10 +486,7 @@ export const firebaseAuthService = {
   },
 
   /**
-   * Send OTP to phone number via Firebase Phone Auth.
-   * Falls back to a dev-mode simulated OTP when Firebase is not configured
-   * so the UI remains functional during local development — but the dev OTP
-   * is shown clearly in the UI (not hidden) so it is obviously a dev mode.
+   * Send OTP to phone number via Firebase Phone Auth with rate limiting.
    */
   async sendPhoneOtp(
     phone: string,
@@ -245,12 +494,26 @@ export const firebaseAuthService = {
   ): Promise<{ confirmationResult: ConfirmationResult | null; demoOtp?: string; isDemo: boolean }> {
     const cleanDigits = phone.replace(/\D/g, '').slice(-10);
     const fullPhone   = `+91${cleanDigits}`;
+    const rateLimitKey = `otp:send:${cleanDigits}`;
+
+    const rateStatus = checkRateLimit(rateLimitKey);
+    if (rateStatus.isBlocked) {
+      throw new Error(
+        `Too many OTP requests for this number. Please wait ${rateStatus.remainingSeconds}s.`
+      );
+    }
+
+    logSecurityEvent('AUTH_LOGIN_ATTEMPT', 'info', {
+      userId: fullPhone,
+      details: { mechanism: 'phone_otp_dispatch' },
+    });
 
     if (auth && hasFirebaseConfig && verifier) {
       try {
         const confirmationResult = await signInWithPhoneNumber(auth, fullPhone, verifier);
         return { confirmationResult, isDemo: false };
       } catch (error) {
+        recordAttempt(rateLimitKey, false, fullPhone);
         console.warn('[Firebase Phone Auth] Live dispatch failed, using dev fallback:', error);
       }
     }
@@ -261,8 +524,7 @@ export const firebaseAuthService = {
   },
 
   /**
-   * Verify OTP and return the authenticated UserProfile.
-   * The name comes from the user's own input — never a hardcoded default.
+   * Verify OTP and return the authenticated UserProfile with rate-limiting.
    */
   async verifyPhoneOtp(
     confirmationResult: ConfirmationResult | null,
@@ -273,29 +535,53 @@ export const firebaseAuthService = {
   ): Promise<UserProfile> {
     const cleanDigits  = (userPhone || '').replace(/\D/g, '').slice(-10);
     const resolvedPhone = cleanDigits ? `+91 ${cleanDigits}` : '';
-    // Never substitute a hardcoded name — use what the user typed, or empty
     const resolvedName = (userName && userName.trim()) || '';
+    const rateLimitKey = `otp:verify:${cleanDigits}`;
+
+    const rateStatus = checkRateLimit(rateLimitKey);
+    if (rateStatus.isBlocked) {
+      throw new Error(
+        `Too many incorrect verification attempts. Please wait ${rateStatus.remainingSeconds}s.`
+      );
+    }
 
     if (confirmationResult) {
-      const cred   = await confirmationResult.confirm(code);
-      const fbUser = cred.user;
+      try {
+        const cred   = await confirmationResult.confirm(code);
+        const fbUser = cred.user;
 
-      const profile: UserProfile = {
-        uid:          fbUser.uid,
-        name:         fbUser.displayName || resolvedName,
-        phone:        fbUser.phoneNumber  || resolvedPhone,
-        email:        fbUser.email        || undefined,
-        authProvider: 'phone',
-        kyc:          loadUserKyc(fbUser.uid)
-      };
+        const profile: UserProfile = {
+          uid:          fbUser.uid,
+          name:         fbUser.displayName || resolvedName,
+          phone:        fbUser.phoneNumber  || resolvedPhone,
+          email:        fbUser.email        || undefined,
+          authProvider: 'phone',
+          kyc:          loadUserKyc(fbUser.uid),
+        };
 
-      saveUserSession(profile);
-      return profile;
+        saveUserSession(profile);
+        recordAttempt(rateLimitKey, true, fbUser.uid);
+
+        logSecurityEvent('AUTH_LOGIN_SUCCESS', 'success', {
+          userId: fbUser.uid,
+          details: { provider: 'phone' },
+        });
+
+        return profile;
+      } catch (error) {
+        recordAttempt(rateLimitKey, false, cleanDigits);
+        logSecurityEvent('AUTH_LOGIN_FAILURE', 'failure', {
+          userId: cleanDigits,
+          details: { provider: 'phone_otp', reason: (error as Error).message },
+        });
+        throw new Error(getGenericAuthErrorMessage(error));
+      }
     }
 
     // Dev mode OTP verification (no real Firebase)
     if (demoOtpExpected && code !== demoOtpExpected && code !== '1234') {
-      throw new Error('Invalid OTP. Please enter the 4-digit code shown in the SMS banner.');
+      recordAttempt(rateLimitKey, false, cleanDigits);
+      throw new Error('Invalid verification code. Please check and try again.');
     }
 
     const uid = `phone-${cleanDigits || Date.now().toString(36)}`;
@@ -304,17 +590,28 @@ export const firebaseAuthService = {
       name:         resolvedName,
       phone:        resolvedPhone,
       authProvider: 'phone',
-      kyc:          loadUserKyc(uid)
+      kyc:          loadUserKyc(uid),
     };
 
     saveUserSession(demoProfile);
+    recordAttempt(rateLimitKey, true, uid);
+
+    logSecurityEvent('AUTH_LOGIN_SUCCESS', 'success', {
+      userId: uid,
+      details: { provider: 'phone_dev_mode' },
+    });
+
     return demoProfile;
   },
 
   /** Sign the user out — clears Firebase session AND localStorage for this user */
   async signOut(): Promise<void> {
-    // Capture UID before clearing session
     const uid = loadUserSession()?.uid;
+    logSecurityEvent('AUTH_LOGOUT', 'info', {
+      userId: uid,
+      details: { action: 'user_initiated_logout' },
+    });
+
     if (auth && hasFirebaseConfig) {
       try { await signOut(auth); } catch (err) {
         console.warn('[Firebase SignOut]', err);
@@ -323,9 +620,15 @@ export const firebaseAuthService = {
     clearUserSession(uid);
   },
 
-  /** Subscribe to Firebase auth state changes */
+  /** Subscribe to Firebase auth state changes with token revocation inspection */
   onAuthStateChange(callback: (user: FirebaseUser | null) => void): () => void {
     if (!auth || !hasFirebaseConfig) return () => {};
-    return onAuthStateChanged(auth, callback);
-  }
+    return onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Inspect token health and handle expired / revoked tokens
+        await getVerifiedIdToken();
+      }
+      callback(user);
+    });
+  },
 };

@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin'
+      );
+    }
+
+    // Validate upload size is under 5MB and format is JPEG, PNG, WEBP, or PDF
+    function isValidDocUpload() {
+      return request.resource.size < 5 * 1024 * 1024
+          && (request.resource.contentType.matches('image/(jpeg|png|webp)') ||
+              request.resource.contentType == 'application/pdf');
+    }
+
+    // ── Public Assets (Brand / Fleet Photos) ──────────────────────────────────────
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── User KYC & Documents (/users/{userId}/*) ─────────────────────────────────
+    match /users/{userId}/{allPaths=**} {
+      // User can read and view only their own uploaded files
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Uploads restricted to authenticated owner with strict content & size constraints
+      allow create, update: if isOwner(userId) && isValidDocUpload();
+
+      // Deletions allowed by owner or administrator
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // ── Default Deny: Block all unmapped bucket paths ─────────────────────────────
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

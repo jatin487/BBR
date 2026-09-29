@@ -1,0 +1,82 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Core Security Helper Functions ────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
+        (request.auth.token.email != null && request.auth.token.email.matches('.*@bbr-admin\\.internal'))
+      );
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function validateUserDoc(data) {
+      return (!('name' in data) || isValidString(data.name, 1, 100)) &&
+             (!('phone' in data) || isValidString(data.phone, 8, 20)) &&
+             (!('email' in data) || isValidString(data.email, 3, 150));
+    }
+
+    function validateBooking(data) {
+      return data.userId == request.auth.uid &&
+             isValidString(data.vehicleName, 1, 120) &&
+             data.totalAmount is number &&
+             data.totalAmount >= 0 &&
+             isValidString(data.customerPhone, 8, 20) &&
+             isValidString(data.status, 2, 30);
+    }
+
+    // ── User Profiles Collection (/users/{userId}) ────────────────────────────────
+    match /users/{userId} {
+      // User can read and modify only their own profile; Admin can read all
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && validateUserDoc(request.resource.data);
+      allow update: if isOwner(userId) && validateUserDoc(request.resource.data);
+      allow delete: if isAdmin();
+
+      // UID-scoped KYC Verification Subcollection
+      match /kyc/{documentId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // ── Bookings Collection (/bookings/{bookingId}) ───────────────────────────────
+    match /bookings/{bookingId} {
+      // User can read only their own bookings; Admin can read all
+      allow read: if (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
+
+      // Authenticated users can create bookings matching their auth.uid and valid schema
+      allow create: if isAuthenticated() && validateBooking(request.resource.data);
+
+      // Only Admins can modify status, fare, or delete existing bookings (prevents tampering)
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Public Catalog Read-Only (/fleet/{vehicleId}) ─────────────────────────────
+    match /fleet/{vehicleId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── Security Default Deny: All unspecified paths strictly forbidden ───────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

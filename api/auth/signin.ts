@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { saveUser, getUserByPhone } from '../_lib/storage.js';
+import { enforceRateLimit, getClientIp } from '../_lib/rateLimit.js';
 
-
-const OTP_STORE: Record<string, { code: string; expiresAt: number }> = {};
+const OTP_STORE: Record<string, { code: string; expiresAt: number; failedAttempts: number }> = {};
 
 const normalizePhone = (value: string) => {
   const digits = value.replace(/\D/g, '');
@@ -24,14 +24,14 @@ const sendBirdSms = async (phone: string, otp: string) => {
     headers: {
       Authorization: `Bearer ${birdApiKey}`,
       'Idempotency-Key': `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       to: phone,
       text: `Your BBR verification code is ${otp}. Valid for 90 seconds.`,
       from: birdSender,
-      category: 'transactional'
-    })
+      category: 'transactional',
+    }),
   });
 
   if (!response.ok) {
@@ -47,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  const clientIp = getClientIp(req);
   const { phone, name, otp, action } = req.body || {};
 
   if (!phone || typeof phone !== 'string') {
@@ -54,12 +55,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const normalizedPhone = normalizePhone(phone);
+  const isDevOrTest = process.env.NODE_ENV !== 'production' || process.env.ALLOW_TEST_OTP_RESPONSE === 'true';
 
+  // ── Action: Send OTP ──────────────────────────────────────────────────────────
   if (action === 'send-otp') {
+    // 1. Enforce IP rate limiting (max 5 requests per 10 mins)
+    const ipAllowed = enforceRateLimit(req, res, `send_otp_ip_${clientIp}`, {
+      maxRequests: 5,
+      windowMs: 10 * 60 * 1000,
+      cooldownMs: 30 * 1000,
+    });
+    if (!ipAllowed) return;
+
+    // 2. Enforce Phone rate limiting (max 4 requests per 10 mins)
+    const phoneAllowed = enforceRateLimit(req, res, `send_otp_phone_${normalizedPhone}`, {
+      maxRequests: 4,
+      windowMs: 10 * 60 * 1000,
+      cooldownMs: 60 * 1000,
+    });
+    if (!phoneAllowed) return;
+
     const code = generateOtp();
     OTP_STORE[normalizedPhone] = {
       code,
-      expiresAt: Date.now() + 90 * 1000
+      expiresAt: Date.now() + 90 * 1000,
+      failedAttempts: 0,
     };
 
     try {
@@ -67,23 +87,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({
         success: true,
         message: `OTP sent to ${normalizedPhone}`,
-        otpCode: code,
-        demo: !!birdResult.demo,
-        expiresIn: 90
+        // In production, never leak OTP in response payload
+        ...(isDevOrTest ? { otpCode: code, demo: !!birdResult.demo } : {}),
+        expiresIn: 90,
       });
     } catch (error) {
       return res.status(200).json({
         success: true,
         message: `OTP generated for ${normalizedPhone}`,
-        otpCode: code,
-        demo: true,
+        ...(isDevOrTest ? { otpCode: code, demo: true } : {}),
         expiresIn: 90,
-        warning: error instanceof Error ? error.message : 'SMS send failed, but OTP was generated locally'
+        warning: error instanceof Error ? error.message : 'SMS dispatch notice',
       });
     }
   }
 
+  // ── Action: Verify OTP ────────────────────────────────────────────────────────
   if (action === 'verify-otp') {
+    // Enforce verification rate limit (max 6 attempts per 15 mins to prevent brute forcing)
+    const verifyAllowed = enforceRateLimit(req, res, `verify_otp_${normalizedPhone}`, {
+      maxRequests: 6,
+      windowMs: 15 * 60 * 1000,
+      cooldownMs: 60 * 1000,
+    });
+    if (!verifyAllowed) return;
+
     if (!otp || typeof otp !== 'string') {
       return res.status(400).json({ message: 'OTP is required' });
     }
@@ -99,6 +127,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (otp !== record.code) {
+      record.failedAttempts = (record.failedAttempts || 0) + 1;
+      if (record.failedAttempts >= 4) {
+        delete OTP_STORE[normalizedPhone];
+        return res.status(400).json({
+          message: 'Too many incorrect attempts. For security, please request a new verification code.',
+        });
+      }
       return res.status(401).json({ message: 'Invalid OTP' });
     }
 
@@ -109,12 +144,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       id: existing?.id || `user-${Date.now()}`,
       name: (name && String(name).trim()) || existing?.name || 'Rider',
       phone: normalizedPhone,
-      createdAt: existing?.createdAt || new Date().toISOString()
+      createdAt: existing?.createdAt || new Date().toISOString(),
     });
 
     return res.status(200).json({
       success: true,
-      user
+      user,
     });
   }
 

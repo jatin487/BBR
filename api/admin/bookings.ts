@@ -1,12 +1,28 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getBookings, updateBooking } from '../_lib/storage.js';
+import { enforceRateLimit, getClientIp } from '../_lib/rateLimit.js';
 
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'bbr-admin-2024';
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
-  // Simple token check — swap for Firebase Admin SDK in production
+  const clientIp = getClientIp(req);
+
+  // Rate limit admin attempts by IP (max 10 requests per minute)
+  const allowed = enforceRateLimit(req, res, `admin_auth_${clientIp}`, {
+    maxRequests: 10,
+    windowMs: 60 * 1000,
+    cooldownMs: 30 * 1000,
+  });
+  if (!allowed) return;
+
   const token = req.headers['x-admin-token'] || req.query.token;
   if (token !== ADMIN_SECRET) {
+    // Punish consecutive invalid token guesses
+    enforceRateLimit(req, res, `admin_fail_${clientIp}`, {
+      maxRequests: 5,
+      windowMs: 15 * 60 * 1000,
+      cooldownMs: 60 * 1000,
+    });
     return res.status(401).json({ message: 'Unauthorized' });
   }
 
@@ -25,7 +41,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     const bookings = getBookings();
 
-    // Sort newest first
     const sorted = [...bookings].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
