@@ -183,49 +183,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* City Dropdown */}
+          {/* Hub Indicator — Bhauwala Only */}
           <div className="relative hidden lg:block">
-            <button
-              onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all"
-              style={{ backgroundColor: 'rgba(26,26,26,0.7)', border: '1px solid #2A2A2A', color: '#9BA1A5', backdropFilter: 'blur(10px)' }}
+            <div
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold"
+              style={{ backgroundColor: 'rgba(26,26,26,0.7)', border: '1px solid rgba(255,106,0,0.2)', color: '#FF6A00', backdropFilter: 'blur(10px)' }}
             >
               <MapPin className="w-3.5 h-3.5" style={{ color: '#FF6A00' }} />
-              <span className="max-w-[150px] truncate">{selectedCity}</span>
-              <ChevronDown className="w-3 h-3" style={{ color: '#656C70' }} />
-            </button>
-
-            {cityDropdownOpen && (
-              <div
-                className="absolute top-full mt-2 left-0 w-64 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in"
-                style={{ backgroundColor: '#111111', border: '1px solid #2A2A2A' }}
-              >
-                <div
-                  className="px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider"
-                  style={{ color: '#656C70', borderBottom: '1px solid #2A2A2A' }}
-                >
-                  Dehradun Hubs & Delivery Points
-                </div>
-                {LOCATIONS.map((loc) => (
-                  <button
-                    key={loc.id}
-                    onClick={() => { onSelectCity(loc.city); setCityDropdownOpen(false); }}
-                    className="w-full text-left px-3.5 py-2 text-xs flex items-center justify-between transition-colors"
-                    style={{
-                      color: selectedCity === loc.city ? '#FF6A00' : '#9BA1A5',
-                      backgroundColor: selectedCity === loc.city ? 'rgba(255,106,0,0.06)' : 'transparent',
-                      fontWeight: selectedCity === loc.city ? '700' : '400'
-                    }}
-                  >
-                    <span className="truncate">{loc.city}</span>
-                    <span className="text-[10px] shrink-0" style={{ color: '#656C70' }}>
-                      {loc.vehicleCount}+ fleet
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
+              <span className="max-w-[180px] truncate">Dehradun (Bhauwala Main Hub)</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>45+ fleet</span>
+            </div>
           </div>
+
 
           {/* Desktop Nav Links */}
           <nav className="hidden xl:flex items-center gap-0.5">
@@ -498,28 +467,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             )}
 
-            {/* Location picker */}
+            {/* Hub indicator — Bhauwala Only */}
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: '#656C70' }}>
-                Dehradun Pickup Point
+                Active Hub
               </label>
-              <div className="grid grid-cols-1 gap-1.5">
-                {LOCATIONS.map((loc) => (
-                  <button
-                    key={loc.id}
-                    onClick={() => { onSelectCity(loc.city); setMobileMenuOpen(false); }}
-                    className="px-3 py-2 rounded-lg text-xs font-medium text-left flex items-center justify-between"
-                    style={{
-                      backgroundColor: selectedCity === loc.city ? 'rgba(255,106,0,0.08)' : '#1A1A1A',
-                      border: `1px solid ${selectedCity === loc.city ? 'rgba(255,106,0,0.3)' : '#2A2A2A'}`,
-                      color: selectedCity === loc.city ? '#FF6A00' : '#9BA1A5',
-                      fontWeight: selectedCity === loc.city ? '700' : '500'
-                    }}
-                  >
-                    <span>{loc.city}</span>
-                    <span className="text-[10px]" style={{ color: '#656C70' }}>{loc.vehicleCount}+ fleet</span>
-                  </button>
-                ))}
+              <div
+                className="px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between"
+                style={{ backgroundColor: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.3)', color: '#FF6A00' }}
+              >
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Dehradun (Bhauwala Main Hub)</span>
+                </div>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>45+ fleet</span>
               </div>
             </div>
 

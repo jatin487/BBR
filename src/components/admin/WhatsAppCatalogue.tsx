@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Phone, MessageSquare, Share2, CheckCircle2, Clock, Users,
-  Search, Plus, Minus, X, ArrowUpRight
+  Search, Plus, Minus, X, ArrowUpRight, ChevronLeft, ChevronRight,
+  Play, Pause, LayoutGrid, SlidersHorizontal, Sparkles
 } from 'lucide-react';
 import { VEHICLES } from '../../data/vehicles';
 import { Vehicle } from '../../types';
@@ -387,6 +388,59 @@ export const WhatsAppCatalogue: React.FC<WhatsAppCatalogueProps> = ({ bookings, 
     return true;
   });
 
+  // Carousel & Image switcher logic
+  const [viewMode, setViewMode] = useState<'grid' | 'carousel'>('grid');
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [autoSwitch, setAutoSwitch] = useState(false);
+  const [vehicleImageIndexes, setVehicleImageIndexes] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (viewMode !== 'carousel' || !autoSwitch || filteredVehicles.length === 0) return;
+    const interval = setInterval(() => {
+      setCarouselIndex((prev) => (prev + 1) % filteredVehicles.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [viewMode, autoSwitch, filteredVehicles.length]);
+
+  useEffect(() => {
+    if (carouselIndex >= filteredVehicles.length && filteredVehicles.length > 0) {
+      setCarouselIndex(0);
+    }
+  }, [filteredVehicles.length, carouselIndex]);
+
+  const getVehicleImages = (v: Vehicle): string[] => {
+    if (v.gallery && v.gallery.length > 0) {
+      return v.gallery;
+    }
+    return [v.image];
+  };
+
+  const getActiveVehicleImage = (v: Vehicle): string => {
+    const images = getVehicleImages(v);
+    const idx = vehicleImageIndexes[v.id] || 0;
+    return images[idx % images.length] || v.image;
+  };
+
+  const nextVehicleImage = (v: Vehicle, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const images = getVehicleImages(v);
+    if (images.length <= 1) return;
+    setVehicleImageIndexes(prev => ({
+      ...prev,
+      [v.id]: ((prev[v.id] || 0) + 1) % images.length
+    }));
+  };
+
+  const prevVehicleImage = (v: Vehicle, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const images = getVehicleImages(v);
+    if (images.length <= 1) return;
+    setVehicleImageIndexes(prev => ({
+      ...prev,
+      [v.id]: ((prev[v.id] || 0) - 1 + images.length) % images.length
+    }));
+  };
+
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -625,6 +679,34 @@ export const WhatsAppCatalogue: React.FC<WhatsAppCatalogueProps> = ({ bookings, 
               </button>
             ))}
           </div>
+
+          {/* View Mode Toggle: Grid vs Carousel Switcher */}
+          <div className="flex items-center gap-1 bg-white/[0.03] p-1 rounded-xl border border-white/[0.08]">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'grid'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="View all models in a grid"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Grid</span>
+            </button>
+            <button
+              onClick={() => setViewMode('carousel')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'carousel'
+                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30 font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="View models as an interactive switching carousel"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>🎠 Carousel</span>
+            </button>
+          </div>
         </div>
 
         <div className="text-xs text-slate-400 font-medium">
@@ -632,287 +714,608 @@ export const WhatsAppCatalogue: React.FC<WhatsAppCatalogueProps> = ({ bookings, 
         </div>
       </div>
 
-      {/* ── Vehicle Catalogue Grid ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredVehicles.map((vehicle) => {
-          const totalUnits = stockOverrides[vehicle.id] ?? (vehicle.availableCount || 3);
-          const { online, manual, totalRented } = getRentalsForVehicle(vehicle);
-          const inStock = Math.max(0, totalUnits - totalRented);
-          const isScooty = vehicle.category === 'scooter';
+      {/* ── CONDITIONAL VIEW: CAROUSEL SWITCHER vs GRID ── */}
+      {viewMode === 'carousel' ? (
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ── CAROUSEL MODE: INTERACTIVE VEHICLE SHOWCASE THAT SWITCHES ── */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        <div className="space-y-4">
+          {filteredVehicles.length === 0 ? (
+            <div className="text-center py-16 bg-[#111622] rounded-3xl border border-white/10 text-slate-400">
+              <p className="text-sm font-semibold">No models match your search filter.</p>
+            </div>
+          ) : (() => {
+            const currentVehicle = filteredVehicles[carouselIndex] || filteredVehicles[0];
+            const totalUnits = stockOverrides[currentVehicle.id] ?? (currentVehicle.availableCount || 3);
+            const { online, manual, totalRented } = getRentalsForVehicle(currentVehicle);
+            const inStock = Math.max(0, totalUnits - totalRented);
+            const isScooty = currentVehicle.category === 'scooter';
+            const galleryImages = getVehicleImages(currentVehicle);
+            const activeImg = getActiveVehicleImage(currentVehicle);
+            const currentImgIndex = (vehicleImageIndexes[currentVehicle.id] || 0) % galleryImages.length;
 
-          return (
-            <div
-              key={vehicle.id}
-              className="rounded-3xl bg-[#111622] border border-white/[0.08] hover:border-emerald-500/30 transition-all flex flex-col overflow-hidden shadow-xl"
-            >
-              {/* Image & Header Badges */}
-              <div className="relative h-44 w-full bg-slate-900/60 overflow-hidden">
-                <img
-                  src={vehicle.image}
-                  alt={vehicle.name}
-                  className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/hero-bike.jpg';
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#111622] via-transparent to-black/40" />
-
-                {/* Top Badges */}
-                <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md text-white border border-white/10">
-                    {isScooty ? '🛵 Scooty' : '🏍️ Bike'} • {vehicle.brand}
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 backdrop-blur-md">
-                    ₹0 Deposit
-                  </span>
-                </div>
-
-                {/* Stock Tag on Top Right */}
-                <div className="absolute top-3 right-3">
-                  <span
-                    className={`px-3 py-1 rounded-full text-xs font-black backdrop-blur-md border ${
-                      inStock > 0
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                        : 'bg-red-500/20 text-red-300 border-red-500/40'
-                    }`}
-                  >
-                    {inStock > 0 ? `🟢 ${inStock} IN STOCK` : '🔴 FULLY RENTED'}
-                  </span>
-                </div>
-
-                {/* Bottom Title in Image */}
-                <div className="absolute bottom-3 left-4 right-4">
-                  <h3 className="text-lg font-black text-white truncate drop-shadow">{vehicle.name}</h3>
-                  <p className="text-[11px] text-slate-300 drop-shadow flex items-center gap-2">
-                    <span>⚡ {vehicle.engineCC} cc</span>
-                    <span>•</span>
-                    <span>⛽ {vehicle.mileage}</span>
-                    <span>•</span>
-                    <span className="text-orange-400 font-bold">₹{vehicle.fullDayRent}/day</span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Body & Inventory Counters */}
-              <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
-                {/* Stock Controls */}
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Fleet Management</span>
-                    <span className="text-xs font-bold text-white">
-                      {totalUnits} Total Units ({inStock} In Stock, {totalRented} Rented)
+            return (
+              <div className="space-y-4">
+                {/* Carousel Top Navigation Bar */}
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.08]">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCarouselIndex((prev) => (prev - 1 + filteredVehicles.length) % filteredVehicles.length)}
+                      className="w-9 h-9 rounded-xl bg-white/5 hover:bg-orange-500/20 text-slate-300 hover:text-white border border-white/10 hover:border-orange-500/30 flex items-center justify-center transition-all cursor-pointer"
+                      title="Previous vehicle"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <span className="text-xs font-mono font-bold text-white bg-black/40 px-3 py-1 rounded-lg border border-white/10">
+                      Model {carouselIndex + 1} / {filteredVehicles.length}
                     </span>
+                    <button
+                      onClick={() => setCarouselIndex((prev) => (prev + 1) % filteredVehicles.length)}
+                      className="w-9 h-9 rounded-xl bg-white/5 hover:bg-orange-500/20 text-slate-300 hover:text-white border border-white/10 hover:border-orange-500/30 flex items-center justify-center transition-all cursor-pointer"
+                      title="Next vehicle"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
                   </div>
 
-                  {/* Stock counter adjusters */}
-                  <div className="flex items-center gap-1.5">
+                  {/* Auto-Switch Toggle */}
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => adjustFleetUnits(vehicle.id, -1)}
-                      className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
-                      title="Decrease total fleet count"
+                      onClick={() => setAutoSwitch(!autoSwitch)}
+                      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                        autoSwitch
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-lg shadow-emerald-500/20'
+                          : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'
+                      }`}
+                      title={autoSwitch ? 'Pause auto-switching' : 'Auto-switch every 4 seconds'}
                     >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="text-xs font-mono font-bold text-white w-6 text-center">{totalUnits}</span>
-                    <button
-                      onClick={() => adjustFleetUnits(vehicle.id, 1)}
-                      className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
-                      title="Increase total fleet count"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
+                      {autoSwitch ? (
+                        <>
+                          <Pause className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Auto-Switch: ON</span>
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping ml-1" />
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3.5 h-3.5" />
+                          <span>▶ Start Auto-Switch</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
 
-                {/* ── Active Renters Section (Connected to WhatsApp) ── */}
-                {totalRented > 0 && (
-                  <div className="space-y-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1">
-                      <Users className="w-3 h-3" />
-                      Active Renters ({totalRented}):
-                    </span>
+                {/* Featured Carousel Showcase Card */}
+                <div className="rounded-3xl bg-[#111622] border border-white/[0.1] shadow-2xl overflow-hidden max-w-4xl mx-auto">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
+                    {/* Left: Large Image with Gallery Switcher */}
+                    <div className="lg:col-span-7 relative h-72 lg:h-full min-h-[300px] bg-slate-950 overflow-hidden group">
+                      <img
+                        src={activeImg}
+                        alt={currentVehicle.name}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/hero-bike.jpg';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#111622] via-transparent to-black/50" />
 
-                    <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
-                      {/* Online bookings */}
-                      {online.map((b) => (
-                        <div
-                          key={b.id}
-                          className="p-2.5 rounded-xl bg-purple-950/20 border border-purple-500/20 space-y-2"
+                      {/* Top Badges */}
+                      <div className="absolute top-4 left-4 flex flex-wrap gap-2 z-10">
+                        <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-black/70 backdrop-blur-md text-white border border-white/10">
+                          {isScooty ? '🛵 Scooty' : '🏍️ Bike'} • {currentVehicle.brand}
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 backdrop-blur-md">
+                          ₹0 Security Deposit
+                        </span>
+                      </div>
+
+                      {/* Stock Tag on Top Right */}
+                      <div className="absolute top-4 right-4 z-10">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-black backdrop-blur-md border ${
+                            inStock > 0
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-red-500/20 text-red-300 border-red-500/40'
+                          }`}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className="text-xs font-bold text-white flex items-center gap-1.5">
-                                <span>{b.customerName || 'Online Customer'}</span>
-                                <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1 rounded">Online</span>
-                              </p>
-                              <p className="text-[10px] text-slate-300 font-mono flex items-center gap-1 mt-0.5">
-                                <Phone className="w-2.5 h-2.5 text-emerald-400" />
-                                {b.customerPhone}
-                              </p>
-                              <p className="text-[10px] text-slate-400 mt-0.5">
-                                Due: {b.returnDate} @ {b.returnTime} ({b.pickupHub})
-                              </p>
-                            </div>
+                          {inStock > 0 ? `🟢 ${inStock} IN STOCK` : '🔴 FULLY RENTED'}
+                        </span>
+                      </div>
 
-                            <button
-                              onClick={() => handleReturnOnlineRental(b.id)}
-                              className="text-[10px] px-2 py-1 rounded bg-white/5 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border border-white/10 transition-all cursor-pointer"
-                              title="Mark bike as returned to stock"
-                            >
-                              Mark Returned
-                            </button>
-                          </div>
-
-                          {/* WhatsApp Connected Quick Actions */}
-                          <div className="flex flex-wrap gap-1.5 pt-1 border-t border-white/5">
-                            <button
-                              onClick={() =>
-                                chatWithRenter(
-                                  b.customerName,
-                                  b.customerPhone,
-                                  vehicle.name,
-                                  b.returnDate,
-                                  b.returnTime,
-                                  'status'
-                                )
-                              }
-                              className="px-2 py-1 rounded-lg text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 flex items-center gap-1 transition-all cursor-pointer"
-                            >
-                              <MessageSquare className="w-2.5 h-2.5" />
-                              WhatsApp Status
-                            </button>
-
-                            <button
-                              onClick={() =>
-                                chatWithRenter(
-                                  b.customerName,
-                                  b.customerPhone,
-                                  vehicle.name,
-                                  b.returnDate,
-                                  b.returnTime,
-                                  'reminder'
-                                )
-                              }
-                              className="px-2 py-1 rounded-lg text-[10px] font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 flex items-center gap-1 transition-all cursor-pointer"
-                            >
-                              <Clock className="w-2.5 h-2.5" />
-                              Return Reminder
-                            </button>
-                          </div>
+                      {/* Gallery Prev/Next Image Controls if multiple photos */}
+                      {galleryImages.length > 1 && (
+                        <div className="absolute inset-y-0 inset-x-2 flex items-center justify-between pointer-events-none z-10">
+                          <button
+                            onClick={(e) => prevVehicleImage(currentVehicle, e)}
+                            className="pointer-events-auto w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer"
+                            title="Previous photo"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => nextVehicleImage(currentVehicle, e)}
+                            className="pointer-events-auto w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer"
+                            title="Next photo"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
                         </div>
-                      ))}
+                      )}
 
-                      {/* Manual rentals */}
-                      {manual.map((m) => (
-                        <div
-                          key={m.id}
-                          className="p-2.5 rounded-xl bg-orange-950/20 border border-orange-500/20 space-y-2"
+                      {/* Gallery Dots Indicator */}
+                      {galleryImages.length > 1 && (
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
+                          {galleryImages.map((_, i) => (
+                            <span
+                              key={i}
+                              className={`h-1.5 rounded-full transition-all ${
+                                i === currentImgIndex ? 'w-5 bg-orange-400' : 'w-1.5 bg-white/40'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right: Specifications & Fleet Management Controls */}
+                    <div className="lg:col-span-5 p-6 flex flex-col justify-between space-y-4">
+                      <div>
+                        <h3 className="text-xl font-black text-white">{currentVehicle.name}</h3>
+                        <p className="text-xs text-slate-300 mt-1 flex items-center gap-2">
+                          <span>⚡ {currentVehicle.engineCC} cc</span>
+                          <span>•</span>
+                          <span>⛽ {currentVehicle.mileage}</span>
+                          <span>•</span>
+                          <span className="text-orange-400 font-bold">₹{currentVehicle.fullDayRent}/day</span>
+                        </p>
+                      </div>
+
+                      {/* Fleet Stock Adjuster */}
+                      <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-slate-400 block">Fleet Management</span>
+                          <span className="text-xs font-bold text-white">
+                            {totalUnits} Units ({inStock} In Stock, {totalRented} Rented)
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => adjustFleetUnits(currentVehicle.id, -1)}
+                            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                            title="Decrease total fleet count"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          <span className="text-sm font-mono font-bold text-white w-6 text-center">{totalUnits}</span>
+                          <button
+                            onClick={() => adjustFleetUnits(currentVehicle.id, 1)}
+                            className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                            title="Increase total fleet count"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Active Renters Panel if any */}
+                      {totalRented > 0 && (
+                        <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1">
+                            <Users className="w-3 h-3" />
+                            Active Renters ({totalRented}):
+                          </span>
+                          {online.map((b) => (
+                            <div key={b.id} className="p-2 rounded-xl bg-purple-950/20 border border-purple-500/20 text-xs text-white flex items-center justify-between">
+                              <div>
+                                <span className="font-bold">{b.customerName}</span>
+                                <span className="text-[10px] text-slate-400 block">{b.customerPhone} · Due: {b.returnDate}</span>
+                              </div>
+                              <button
+                                onClick={() => handleReturnOnlineRental(b.id)}
+                                className="text-[10px] px-2 py-0.5 rounded bg-white/10 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300"
+                              >
+                                Return
+                              </button>
+                            </div>
+                          ))}
+                          {manual.map((m) => (
+                            <div key={m.id} className="p-2 rounded-xl bg-orange-950/20 border border-orange-500/20 text-xs text-white flex items-center justify-between">
+                              <div>
+                                <span className="font-bold">{m.customerName}</span>
+                                <span className="text-[10px] text-slate-400 block">{m.customerPhone} · Due: {m.returnDate}</span>
+                              </div>
+                              <button
+                                onClick={() => handleReturnManualRental(m.id)}
+                                className="text-[10px] px-2 py-0.5 rounded bg-white/10 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300"
+                              >
+                                Return
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => shareSingleVehicle(currentVehicle, inStock)}
+                          className="py-2.5 px-3 rounded-xl text-xs font-bold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className="text-xs font-bold text-white flex items-center gap-1.5">
-                                <span>{m.customerName}</span>
-                                <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1 rounded">Walk-in</span>
-                              </p>
-                              <p className="text-[10px] text-slate-300 font-mono flex items-center gap-1 mt-0.5">
-                                <Phone className="w-2.5 h-2.5 text-emerald-400" />
-                                {m.customerPhone}
-                              </p>
-                              <p className="text-[10px] text-slate-400 mt-0.5">
-                                Due: {m.returnDate} @ {m.returnTime}
-                              </p>
-                            </div>
+                          <MessageSquare className="w-4 h-4" />
+                          <span>WhatsApp Card</span>
+                        </button>
 
-                            <button
-                              onClick={() => handleReturnManualRental(m.id)}
-                              className="text-[10px] px-2 py-1 rounded bg-white/5 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border border-white/10 transition-all cursor-pointer"
-                            >
-                              Mark Returned
-                            </button>
-                          </div>
-
-                          {/* WhatsApp Connected Quick Actions */}
-                          <div className="flex flex-wrap gap-1.5 pt-1 border-t border-white/5">
-                            <button
-                              onClick={() =>
-                                chatWithRenter(
-                                  m.customerName,
-                                  m.customerPhone,
-                                  vehicle.name,
-                                  m.returnDate,
-                                  m.returnTime,
-                                  'status'
-                                )
-                              }
-                              className="px-2 py-1 rounded-lg text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 flex items-center gap-1 transition-all cursor-pointer"
-                            >
-                              <MessageSquare className="w-2.5 h-2.5" />
-                              WhatsApp Renter
-                            </button>
-
-                            <button
-                              onClick={() =>
-                                chatWithRenter(
-                                  m.customerName,
-                                  m.customerPhone,
-                                  vehicle.name,
-                                  m.returnDate,
-                                  m.returnTime,
-                                  'reminder'
-                                )
-                              }
-                              className="px-2 py-1 rounded-lg text-[10px] font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 flex items-center gap-1 transition-all cursor-pointer"
-                            >
-                              <Clock className="w-2.5 h-2.5" />
-                              Return Reminder
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        <button
+                          disabled={inStock <= 0}
+                          onClick={() => {
+                            setRentingVehicle(currentVehicle);
+                            setRentReturnDate(
+                              new Date(Date.now() + 86400000).toLocaleDateString('en-IN', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })
+                            );
+                          }}
+                          className={`py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            inStock > 0
+                              ? 'bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-600/20'
+                              : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
+                          }`}
+                        >
+                          <ArrowUpRight className="w-4 h-4" />
+                          <span>{inStock > 0 ? 'Rent to Person' : 'No Stock'}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                )}
+                </div>
 
-                {/* Action Buttons for Vehicle */}
-                <div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-2">
-                  {/* Share Vehicle Card via WhatsApp */}
-                  <button
-                    onClick={() => shareSingleVehicle(vehicle, inStock)}
-                    className="py-2 px-3 rounded-xl text-xs font-bold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                    title="Send vehicle card to customer on WhatsApp"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    <span>WhatsApp Card</span>
-                  </button>
-
-                  {/* Rent Out / Assign to Renter */}
-                  <button
-                    disabled={inStock <= 0}
-                    onClick={() => {
-                      setRentingVehicle(vehicle);
-                      setRentReturnDate(
-                        new Date(Date.now() + 86400000).toLocaleDateString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })
-                      );
-                    }}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                      inStock > 0
-                        ? 'bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-600/20'
-                        : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
-                    }`}
-                  >
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                    <span>{inStock > 0 ? 'Rent to Person' : 'No Stock'}</span>
-                  </button>
+                {/* Bottom Quick Model Switcher Thumbnails Strip */}
+                <div className="flex items-center gap-2 overflow-x-auto py-2 px-1" style={{ scrollbarWidth: 'none' }}>
+                  {filteredVehicles.map((v, i) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setCarouselIndex(i)}
+                      className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                        carouselIndex === i
+                          ? 'bg-orange-500 text-white border-orange-400 shadow-md shadow-orange-500/30'
+                          : 'bg-white/[0.03] text-slate-400 hover:text-white border-white/[0.08]'
+                      }`}
+                    >
+                      <img src={v.image} alt={v.name} className="w-5 h-5 rounded-full object-cover" />
+                      <span className="truncate max-w-[120px]">{v.name}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })()}
+        </div>
+      ) : (
+        /* ═══════════════════════════════════════════════════════════════════ */
+        /* ── GRID MODE: ALL VEHICLES WITH GALLERY PHOTO SWITCHER ── */
+        /* ═══════════════════════════════════════════════════════════════════ */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredVehicles.map((vehicle) => {
+            const totalUnits = stockOverrides[vehicle.id] ?? (vehicle.availableCount || 3);
+            const { online, manual, totalRented } = getRentalsForVehicle(vehicle);
+            const inStock = Math.max(0, totalUnits - totalRented);
+            const isScooty = vehicle.category === 'scooter';
+            const galleryImages = getVehicleImages(vehicle);
+            const activeImg = getActiveVehicleImage(vehicle);
+            const currentImgIndex = (vehicleImageIndexes[vehicle.id] || 0) % galleryImages.length;
+
+            return (
+              <div
+                key={vehicle.id}
+                className="rounded-3xl bg-[#111622] border border-white/[0.08] hover:border-emerald-500/30 transition-all flex flex-col overflow-hidden shadow-xl"
+              >
+                {/* Image & Header Badges */}
+                <div className="relative h-44 w-full bg-slate-900/60 overflow-hidden group">
+                  <img
+                    src={activeImg}
+                    alt={vehicle.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/hero-bike.jpg';
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#111622] via-transparent to-black/40" />
+
+                  {/* Top Badges */}
+                  <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md text-white border border-white/10">
+                      {isScooty ? '🛵 Scooty' : '🏍️ Bike'} • {vehicle.brand}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 backdrop-blur-md">
+                      ₹0 Deposit
+                    </span>
+                  </div>
+
+                  {/* Stock Tag on Top Right */}
+                  <div className="absolute top-3 right-3 z-10">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-black backdrop-blur-md border ${
+                        inStock > 0
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                          : 'bg-red-500/20 text-red-300 border-red-500/40'
+                      }`}
+                    >
+                      {inStock > 0 ? `🟢 ${inStock} IN STOCK` : '🔴 FULLY RENTED'}
+                    </span>
+                  </div>
+
+                  {/* Gallery Controls on Card if multiple photos */}
+                  {galleryImages.length > 1 && (
+                    <div className="absolute inset-y-0 inset-x-1.5 flex items-center justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      <button
+                        onClick={(e) => prevVehicleImage(vehicle, e)}
+                        className="pointer-events-auto w-6 h-6 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer"
+                        title="Previous photo"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => nextVehicleImage(vehicle, e)}
+                        className="pointer-events-auto w-6 h-6 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center backdrop-blur-md border border-white/20 transition-all cursor-pointer"
+                        title="Next photo"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Gallery Dots Indicator */}
+                  {galleryImages.length > 1 && (
+                    <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-1 z-10">
+                      {galleryImages.map((_, i) => (
+                        <span
+                          key={i}
+                          className={`h-1 rounded-full transition-all ${
+                            i === currentImgIndex ? 'w-3 bg-orange-400' : 'w-1 bg-white/40'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Bottom Title in Image */}
+                  <div className="absolute bottom-3 left-4 right-4">
+                    <h3 className="text-lg font-black text-white truncate drop-shadow">{vehicle.name}</h3>
+                    <p className="text-[11px] text-slate-300 drop-shadow flex items-center gap-2">
+                      <span>⚡ {vehicle.engineCC} cc</span>
+                      <span>•</span>
+                      <span>⛽ {vehicle.mileage}</span>
+                      <span>•</span>
+                      <span className="text-orange-400 font-bold">₹{vehicle.fullDayRent}/day</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Body & Inventory Counters */}
+                <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
+                  {/* Stock Controls */}
+                  <div className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Fleet Management</span>
+                      <span className="text-xs font-bold text-white">
+                        {totalUnits} Total Units ({inStock} In Stock, {totalRented} Rented)
+                      </span>
+                    </div>
+
+                    {/* Stock counter adjusters */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => adjustFleetUnits(vehicle.id, -1)}
+                        className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                        title="Decrease total fleet count"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-xs font-mono font-bold text-white w-6 text-center">{totalUnits}</span>
+                      <button
+                        onClick={() => adjustFleetUnits(vehicle.id, 1)}
+                        className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                        title="Increase total fleet count"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ── Active Renters Section (Connected to WhatsApp) ── */}
+                  {totalRented > 0 && (
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        Active Renters ({totalRented}):
+                      </span>
+
+                      <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                        {/* Online bookings */}
+                        {online.map((b) => (
+                          <div
+                            key={b.id}
+                            className="p-2.5 rounded-xl bg-purple-950/20 border border-purple-500/20 space-y-2"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                                  <span>{b.customerName || 'Online Customer'}</span>
+                                  <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1 rounded">Online</span>
+                                </p>
+                                <p className="text-[10px] text-slate-300 font-mono flex items-center gap-1 mt-0.5">
+                                  <Phone className="w-2.5 h-2.5 text-emerald-400" />
+                                  {b.customerPhone}
+                                </p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                  Due: {b.returnDate} @ {b.returnTime} ({b.pickupHub})
+                                </p>
+                              </div>
+
+                              <button
+                                onClick={() => handleReturnOnlineRental(b.id)}
+                                className="text-[10px] px-2 py-1 rounded bg-white/5 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border border-white/10 transition-all cursor-pointer"
+                                title="Mark bike as returned to stock"
+                              >
+                                Mark Returned
+                              </button>
+                            </div>
+
+                            {/* WhatsApp Connected Quick Actions */}
+                            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-white/5">
+                              <button
+                                onClick={() =>
+                                  chatWithRenter(
+                                    b.customerName,
+                                    b.customerPhone,
+                                    vehicle.name,
+                                    b.returnDate,
+                                    b.returnTime,
+                                    'status'
+                                  )
+                                }
+                                className="px-2 py-1 rounded-lg text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 flex items-center gap-1 transition-all cursor-pointer"
+                              >
+                                <MessageSquare className="w-2.5 h-2.5" />
+                                WhatsApp Status
+                              </button>
+
+                              <button
+                                onClick={() =>
+                                  chatWithRenter(
+                                    b.customerName,
+                                    b.customerPhone,
+                                    vehicle.name,
+                                    b.returnDate,
+                                    b.returnTime,
+                                    'reminder'
+                                  )
+                                }
+                                className="px-2 py-1 rounded-lg text-[10px] font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 flex items-center gap-1 transition-all cursor-pointer"
+                              >
+                                <Clock className="w-2.5 h-2.5" />
+                                Return Reminder
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Manual rentals */}
+                        {manual.map((m) => (
+                          <div
+                            key={m.id}
+                            className="p-2.5 rounded-xl bg-orange-950/20 border border-orange-500/20 space-y-2"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                                  <span>{m.customerName}</span>
+                                  <span className="text-[9px] bg-orange-500/20 text-orange-300 px-1 rounded">Walk-in</span>
+                                </p>
+                                <p className="text-[10px] text-slate-300 font-mono flex items-center gap-1 mt-0.5">
+                                  <Phone className="w-2.5 h-2.5 text-emerald-400" />
+                                  {m.customerPhone}
+                                </p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                  Due: {m.returnDate} @ {m.returnTime}
+                                </p>
+                              </div>
+
+                              <button
+                                onClick={() => handleReturnManualRental(m.id)}
+                                className="text-[10px] px-2 py-1 rounded bg-white/5 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border border-white/10 transition-all cursor-pointer"
+                              >
+                                Mark Returned
+                              </button>
+                            </div>
+
+                            {/* WhatsApp Connected Quick Actions */}
+                            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-white/5">
+                              <button
+                                onClick={() =>
+                                  chatWithRenter(
+                                    m.customerName,
+                                    m.customerPhone,
+                                    vehicle.name,
+                                    m.returnDate,
+                                    m.returnTime,
+                                    'status'
+                                  )
+                                }
+                                className="px-2 py-1 rounded-lg text-[10px] font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 flex items-center gap-1 transition-all cursor-pointer"
+                              >
+                                <MessageSquare className="w-2.5 h-2.5" />
+                                WhatsApp Renter
+                              </button>
+
+                              <button
+                                onClick={() =>
+                                  chatWithRenter(
+                                    m.customerName,
+                                    m.customerPhone,
+                                    vehicle.name,
+                                    m.returnDate,
+                                    m.returnTime,
+                                    'reminder'
+                                  )
+                                }
+                                className="px-2 py-1 rounded-lg text-[10px] font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 flex items-center gap-1 transition-all cursor-pointer"
+                              >
+                                <Clock className="w-2.5 h-2.5" />
+                                Return Reminder
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Buttons for Vehicle */}
+                  <div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-2">
+                    {/* Share Vehicle Card via WhatsApp */}
+                    <button
+                      onClick={() => shareSingleVehicle(vehicle, inStock)}
+                      className="py-2 px-3 rounded-xl text-xs font-bold text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      title="Send vehicle card to customer on WhatsApp"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>WhatsApp Card</span>
+                    </button>
+
+                    {/* Rent Out / Assign to Renter */}
+                    <button
+                      disabled={inStock <= 0}
+                      onClick={() => {
+                        setRentingVehicle(vehicle);
+                        setRentReturnDate(
+                          new Date(Date.now() + 86400000).toLocaleDateString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })
+                        );
+                      }}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        inStock > 0
+                          ? 'bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-600/20'
+                          : 'bg-white/5 text-slate-500 cursor-not-allowed border border-white/5'
+                      }`}
+                    >
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                      <span>{inStock > 0 ? 'Rent to Person' : 'No Stock'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── Assign / Rent Out Modal ── */}
       {rentingVehicle && (

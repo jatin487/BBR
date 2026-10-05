@@ -132,7 +132,7 @@ export const VehicleDetailsModal: React.FC<VehicleDetailsModalProps> = ({
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="flex items-center gap-2 text-slate-200">
                     <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>{vehicle.helmetIncluded > 0 ? `${vehicle.helmetIncluded} ISI Helmets Included` : 'AC & Fast Charger'}</span>
+                    <span>{vehicle.helmetIncluded > 0 ? `With ${vehicle.helmetIncluded} Helmets Included` : 'AC & Fast Charger'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-200">
                     <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />

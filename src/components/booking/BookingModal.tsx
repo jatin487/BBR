@@ -800,6 +800,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <div>
                     <span className="text-slate-500 text-[10px] uppercase font-semibold">Pickup Hub</span>
                     <p className="font-bold text-slate-200">{pickupHub}</p>
+                    <a
+                      href="https://maps.google.com/?q=Bhauwala,Dehradun,Uttarakhand+248007"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] text-blue-400 underline flex items-center gap-0.5 mt-0.5"
+                    >
+                      📍 View on Google Maps
+                    </a>
                   </div>
                   <div>
                     <span className="text-slate-500 text-[10px] uppercase font-semibold">Pickup Time</span>
@@ -839,6 +847,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <Download className="w-4 h-4" />
                   <span>Download / Print Invoice</span>
                 </button>
+                <a
+                  href="https://maps.google.com/?q=Bhauwala,Dehradun,Uttarakhand+248007"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-2"
+                >
+                  <span>📍</span>
+                  <span>Navigate to Pickup Hub</span>
+                </a>
                 <a
                   href={`https://wa.me/918507067716?text=Hi%20BBR,%20my%20booking%20ID%20is%20${bookingId}.%20Please%20send%20pickup%20location%20map.`}
                   target="_blank"

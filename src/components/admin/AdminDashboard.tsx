@@ -3,10 +3,15 @@ import {
   ShieldCheck, RefreshCw, Car, Bike, Users, Banknote, TrendingUp,
   MapPin, Phone, Mail, Clock, Calendar, ChevronDown, ChevronUp,
   CheckCircle, XCircle, Loader2, Navigation, Eye, Filter, Search,
-  AlertTriangle, Sparkles, X, Download, MessageSquare
+  AlertTriangle, Sparkles, X, Download, MessageSquare, Package,
+  DollarSign, FileWarning, ExternalLink
 } from 'lucide-react';
 import { WhatsAppCatalogue } from './WhatsAppCatalogue';
 import { SecurityStatusPanel } from './SecurityStatusPanel';
+import { InventoryTab } from './InventoryTab';
+import { UsersTab } from './UsersTab';
+import { CostingTab } from './CostingTab';
+import { AccidentClaimsTab } from './AccidentClaimsTab';
 
 const ADMIN_TOKEN = 'bbr-admin-2024'; // must match api/admin/bookings.ts
 
@@ -77,7 +82,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
   const [filterType, setFilterType] = useState<'all' | 'bike' | 'taxi'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'confirmed' | 'pending' | 'cancelled' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeAdminTab, setActiveAdminTab] = useState<'whatsapp' | 'bookings' | 'security'>('whatsapp');
+  const [activeAdminTab, setActiveAdminTab] = useState<'whatsapp' | 'bookings' | 'security' | 'inventory' | 'users' | 'costing' | 'claims'>('whatsapp');
 
   const computeStats = (list: Booking[]): Stats => {
     const s: Stats = {
@@ -378,6 +383,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           />
         ) : activeAdminTab === 'security' ? (
           <SecurityStatusPanel />
+        ) : activeAdminTab === 'inventory' ? (
+          <InventoryTab bookings={bookings} />
+        ) : activeAdminTab === 'users' ? (
+          <UsersTab bookings={bookings} />
+        ) : activeAdminTab === 'costing' ? (
+          <CostingTab />
+        ) : activeAdminTab === 'claims' ? (
+          <AccidentClaimsTab bookings={bookings} />
         ) : (
           <>
           {/* Zero-deposit badge — visible at top of bookings tab */}
@@ -642,6 +655,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                             <Mail className="w-3 h-3" />Email
                           </a>
                         )}
+                        {/* Google Maps: Pickup Location */}
+                        {(booking.pickupAddress || booking.pickupHub) && (
+                          <a
+                            href={`https://maps.google.com/?q=${encodeURIComponent(booking.pickupAddress || booking.pickupHub + ', Dehradun, Uttarakhand')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-80"
+                            style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}
+                            title="Open pickup location in Google Maps"
+                          >
+                            <ExternalLink className="w-3 h-3" />Maps: Pickup
+                          </a>
+                        )}
+                        {/* Google Maps: Drop Location */}
+                        {(booking.dropAddress || booking.dropHub) && (
+                          <a
+                            href={`https://maps.google.com/?q=${encodeURIComponent(booking.dropAddress || booking.dropHub + ', Dehradun, Uttarakhand')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-80"
+                            style={{ background: 'rgba(59,130,246,0.08)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.15)' }}
+                            title="Open drop location in Google Maps"
+                          >
+                            <ExternalLink className="w-3 h-3" />Maps: Drop
+                          </a>
+                        )}
+                        {/* WhatsApp with invoice details + location */}
+                        {isTaxi && booking.pickupAddress && (
+                          <a
+                            href={`https://wa.me/${booking.customerPhone?.replace(/\D/g, '')}?text=${encodeURIComponent(`Hi ${booking.customerName}! Your BBR taxi booking (${booking.id}) is confirmed.%0APickup: ${booking.pickupAddress}%0ADrop: ${booking.dropAddress}%0ADate: ${booking.pickupDate} at ${booking.pickupTime}%0AAmount: ₹${booking.totalAmount || booking.estimatedFare}%0ALocation: https://maps.google.com/?q=${booking.pickupAddress}`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-80"
+                            style={{ background: 'rgba(37,211,102,0.08)', color: '#25d366', border: '1px solid rgba(37,211,102,0.15)' }}
+                            title="Send invoice with location via WhatsApp"
+                          >
+                            <Navigation className="w-3 h-3" />Invoice + Location
+                          </a>
+                        )}
                       </div>
 
                       {/* Change Status Buttons */}
@@ -754,7 +806,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
 
       {/* ── Sticky Bottom Navigation (Mobile-first) ── */}
       <div
-        className="flex-shrink-0 flex items-stretch border-t"
+        className="flex-shrink-0 grid grid-cols-6 border-t"
         style={{
           background: 'rgba(10,10,10,0.98)',
           backdropFilter: 'blur(20px)',
@@ -764,7 +816,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
       >
         <button
           onClick={() => { setActiveAdminTab('whatsapp'); fetchBookings(); }}
-          className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all cursor-pointer"
+          className="flex flex-col items-center justify-center gap-1 px-1 py-3 transition-all cursor-pointer hover:bg-white/[0.02]"
           style={{ color: activeAdminTab === 'whatsapp' ? '#10b981' : '#656C70' }}
         >
           <MessageSquare className="w-5 h-5" />
@@ -772,7 +824,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
         </button>
         <button
           onClick={() => { setActiveAdminTab('bookings'); fetchBookings(); }}
-          className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all cursor-pointer relative"
+          className="flex flex-col items-center justify-center gap-1 px-1 py-3 transition-all cursor-pointer relative hover:bg-white/[0.02]"
           style={{ color: activeAdminTab === 'bookings' ? '#FF6A00' : '#656C70' }}
         >
           <div className="relative">
@@ -789,12 +841,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
           <span className="text-[10px] font-bold">Bookings</span>
         </button>
         <button
-          onClick={() => setActiveAdminTab('security')}
-          className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all cursor-pointer"
-          style={{ color: activeAdminTab === 'security' ? '#3b82f6' : '#656C70' }}
+          onClick={() => setActiveAdminTab('inventory')}
+          className="flex flex-col items-center justify-center gap-1 px-1 py-3 transition-all cursor-pointer hover:bg-white/[0.02]"
+          style={{ color: activeAdminTab === 'inventory' ? '#a78bfa' : '#656C70' }}
         >
-          <ShieldCheck className="w-5 h-5" />
-          <span className="text-[10px] font-bold">Security</span>
+          <Package className="w-5 h-5" />
+          <span className="text-[10px] font-bold">Inventory</span>
+        </button>
+        <button
+          onClick={() => setActiveAdminTab('users')}
+          className="flex flex-col items-center justify-center gap-1 px-1 py-3 transition-all cursor-pointer hover:bg-white/[0.02]"
+          style={{ color: activeAdminTab === 'users' ? '#60a5fa' : '#656C70' }}
+        >
+          <Users className="w-5 h-5" />
+          <span className="text-[10px] font-bold">Users</span>
+        </button>
+        <button
+          onClick={() => setActiveAdminTab('costing')}
+          className="flex flex-col items-center justify-center gap-1 px-1 py-3 transition-all cursor-pointer hover:bg-white/[0.02]"
+          style={{ color: activeAdminTab === 'costing' ? '#fbbf24' : '#656C70' }}
+        >
+          <DollarSign className="w-5 h-5" />
+          <span className="text-[10px] font-bold">Pricing</span>
+        </button>
+        <button
+          onClick={() => setActiveAdminTab('claims')}
+          className="flex flex-col items-center justify-center gap-1 px-1 py-3 transition-all cursor-pointer hover:bg-white/[0.02]"
+          style={{ color: activeAdminTab === 'claims' ? '#ef4444' : '#656C70' }}
+        >
+          <FileWarning className="w-5 h-5" />
+          <span className="text-[10px] font-bold">Claims</span>
         </button>
       </div>
     </div>

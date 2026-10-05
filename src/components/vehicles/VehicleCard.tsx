@@ -192,7 +192,7 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
 
             {vehicle.helmetIncluded > 0 && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ color: '#FF6A00', backgroundColor: 'rgba(255,106,0,0.08)', border: '1px solid rgba(255,106,0,0.2)' }}>
-                ⛑️ {vehicle.helmetIncluded} Helmet Free
+                ⛑️ With {vehicle.helmetIncluded} Helmets Included
               </span>
             )}
           </div>
