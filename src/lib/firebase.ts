@@ -170,17 +170,17 @@ export const saveUserSession = (profile: UserProfile): void => {
     );
 
     // ── Admin real-time sync ──────────────────────────────────────────────────
-    // Write to the UID-scoped key that UsersTab.loadAllUsers() scans
+    // Write to the UID-scoped key that UsersTab scans
     if (profile.uid) {
       localStorage.setItem(`bbr_user_session_${profile.uid}`, JSON.stringify(profile));
     }
 
-    // Upsert the user into bbr_backend_data.users so the admin sees all users
+    // Upsert the user into bbr_backend_data.users so admin sees all users
     try {
       const backendRaw = localStorage.getItem('bbr_backend_data');
       const backendData: { users?: UserProfile[] } = backendRaw ? JSON.parse(backendRaw) : {};
       if (!Array.isArray(backendData.users)) backendData.users = [];
-      const idx = backendData.users.findIndex((u: UserProfile) => u.uid === profile.uid);
+      const idx = backendData.users.findIndex((u: UserProfile) => u.uid === profile.uid || (profile.phone && u.phone === profile.phone));
       if (idx >= 0) {
         backendData.users[idx] = { ...backendData.users[idx], ...profile };
       } else {
@@ -189,12 +189,25 @@ export const saveUserSession = (profile: UserProfile): void => {
       localStorage.setItem('bbr_backend_data', JSON.stringify(backendData));
     } catch { /* ignore */ }
 
-    // Notify the admin panel (same tab) via BroadcastChannel
+    // Sync to backend server in background so admin sees it cross-device
+    try {
+      fetch('/api/users/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      }).catch(() => {});
+    } catch { /* ignore */ }
+
+    // Notify the admin panel (same tab or other tabs)
     try {
       const bc = new BroadcastChannel('bbr_user_updates');
       bc.postMessage({ type: 'USER_SIGNED_IN', profile });
       bc.close();
     } catch { /* BroadcastChannel not supported */ }
+
+    try {
+      window.dispatchEvent(new CustomEvent('bbr_user_updated', { detail: profile }));
+    } catch { /* ignore */ }
   } catch { /* quota / private-mode */ }
 };
 
@@ -209,6 +222,29 @@ export const loadUserSession = (): UserProfile | null => {
         if (storedKyc) parsed.kyc = storedKyc;
       }
       return parsed;
+    }
+
+    // Legacy fallback: if bbr-user-profile is absent, check bbr-user
+    const legacyRaw = localStorage.getItem(LEGACY_USER_KEY);
+    if (legacyRaw) {
+      const p = JSON.parse(legacyRaw) as { name?: string; phone?: string; email?: string };
+      if (p && (p.name || p.phone || p.email)) {
+        const cleanDigits = (p.phone || '').replace(/\D/g, '').slice(-10);
+        const recovered: UserProfile = {
+          uid: cleanDigits ? `phone-${cleanDigits}` : `local-user`,
+          name: p.name || 'Rider',
+          phone: p.phone || '',
+          email: p.email || undefined,
+          authProvider: p.email ? 'google' : 'phone',
+          kyc: cleanDigits ? loadUserKyc(`phone-${cleanDigits}`) : null,
+        };
+        // Upgrade legacy session to standard session key
+        try {
+          localStorage.setItem(USER_SESSION_KEY, JSON.stringify(recovered));
+          localStorage.setItem(`bbr_user_session_${recovered.uid}`, JSON.stringify(recovered));
+        } catch { /* ignore */ }
+        return recovered;
+      }
     }
   } catch { return null; }
   return null;

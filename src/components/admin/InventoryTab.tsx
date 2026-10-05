@@ -54,10 +54,12 @@ const STATUS_CONFIG: Record<VehicleUnit['status'], { bg: string; text: string; b
 
 interface Booking {
   id: string;
+  userId?: string;
   vehicleId: string;
   vehicleName: string;
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   status: string;
   pickupDate: string;
 }
@@ -202,40 +204,74 @@ interface SignedInUser {
   authProvider?: string;
 }
 
-function loadSignedInUsers(): SignedInUser[] {
+function loadSignedInUsers(bookingsList: Booking[] = []): SignedInUser[] {
   try {
-    const seen = new Set<string>();
-    const users: SignedInUser[] = [];
+    const userMap = new Map<string, SignedInUser>();
 
     const addUser = (raw: unknown) => {
-      const u = raw as SignedInUser;
-      if (u && u.uid && !seen.has(u.uid)) {
-        seen.add(u.uid);
-        users.push(u);
+      if (!raw || typeof raw !== 'object') return;
+      const u = raw as Record<string, unknown>;
+      const name = String(u.name || u.customerName || '').trim();
+      const phone = String(u.phone || u.customerPhone || '').trim();
+      const cleanDigits = phone.replace(/\D/g, '').slice(-10);
+      const email = String(u.email || u.customerEmail || '').trim();
+      const rawUid = String(u.uid || u.id || u.userId || '').trim();
+
+      if (!name && !cleanDigits && !email && !rawUid) return;
+
+      const dedupeKey = cleanDigits ? `phone:${cleanDigits}` : email ? `email:${email.toLowerCase()}` : `uid:${rawUid || name}`;
+      const resolvedUid = rawUid && rawUid !== 'guest' ? rawUid : (cleanDigits ? `phone-${cleanDigits}` : `user-${Math.random().toString(36).slice(2, 8)}`);
+
+      if (!userMap.has(dedupeKey)) {
+        userMap.set(dedupeKey, {
+          uid: resolvedUid,
+          name: name || 'Rider',
+          phone: cleanDigits ? `+91 ${cleanDigits}` : phone,
+          email: email || undefined,
+          authProvider: (u.authProvider as string) || (email ? 'google' : 'phone'),
+        });
       }
     };
 
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key) continue;
-      if (
-        key.startsWith('bbr_user_session_') ||
-        key === 'bbr_user_session' ||
-        key === 'bbr-user-profile'
-      ) {
-        try { addUser(JSON.parse(localStorage.getItem(key)!)); } catch { /* skip */ }
+    // Scan localStorage
+    if (typeof localStorage !== 'undefined') {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        if (
+          key.startsWith('bbr_user_session_') ||
+          key === 'bbr_user_session' ||
+          key === 'bbr-user-profile' ||
+          key === 'bbr-user'
+        ) {
+          try { addUser(JSON.parse(localStorage.getItem(key)!)); } catch { /* skip */ }
+        }
       }
+
+      try {
+        const bd = localStorage.getItem('bbr_backend_data');
+        if (bd) {
+          const data = JSON.parse(bd) as { users?: unknown[] };
+          if (Array.isArray(data.users)) data.users.forEach(addUser);
+        }
+      } catch { /* skip */ }
     }
 
-    try {
-      const bd = localStorage.getItem('bbr_backend_data');
-      if (bd) {
-        const data = JSON.parse(bd) as { users?: unknown[] };
-        if (Array.isArray(data.users)) data.users.forEach(addUser);
-      }
-    } catch { /* skip */ }
+    // Also scan bookings
+    if (Array.isArray(bookingsList)) {
+      bookingsList.forEach(b => {
+        if (b.customerPhone || b.customerName) {
+          addUser({
+            uid: b.userId,
+            name: b.customerName,
+            phone: b.customerPhone,
+            email: b.customerEmail,
+          });
+        }
+      });
+    }
 
-    return users;
+    return Array.from(userMap.values());
   } catch {
     return [];
   }
@@ -268,22 +304,54 @@ export const InventoryTab: React.FC<Props> = ({ bookings }) => {
   const [editNotes, setEditNotes] = useState('');
 
   // ── Real-time signed-in users ───────────────────────────────────────────────
-  const [signedInUsers, setSignedInUsers] = useState<SignedInUser[]>(() => loadSignedInUsers());
+  const [signedInUsers, setSignedInUsers] = useState<SignedInUser[]>(() => loadSignedInUsers(bookings));
   const [newUserUids, setNewUserUids] = useState<Set<string>>(new Set());
 
-  const refreshUsers = useCallback(() => {
-    setSignedInUsers(loadSignedInUsers());
-  }, []);
+  const refreshUsers = useCallback(async () => {
+    const local = loadSignedInUsers(bookings);
+    setSignedInUsers(local);
+
+    try {
+      const res = await fetch('/api/admin/users?token=bbr-admin-2024');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.users)) {
+          const map = new Map<string, SignedInUser>();
+          local.forEach(u => map.set(u.uid, u));
+          data.users.forEach((u: SignedInUser) => {
+            const uid = u.uid || (u as unknown as { id: string }).id;
+            if (uid && !map.has(uid)) {
+              map.set(uid, {
+                uid,
+                name: u.name || 'Rider',
+                phone: u.phone,
+                email: u.email,
+                authProvider: u.authProvider,
+              });
+            }
+          });
+          setSignedInUsers(Array.from(map.values()));
+        }
+      }
+    } catch { /* offline / dev fallback */ }
+  }, [bookings]);
 
   useEffect(() => {
+    refreshUsers();
+
     const onStorage = (e: StorageEvent) => {
       if (
         e.key?.startsWith('bbr_user_session_') ||
         e.key === 'bbr-user-profile' ||
-        e.key === 'bbr_backend_data'
+        e.key === 'bbr-user' ||
+        e.key === 'bbr_backend_data' ||
+        e.key === 'bbr-bookings'
       ) refreshUsers();
     };
     window.addEventListener('storage', onStorage);
+
+    const onCustom = () => refreshUsers();
+    window.addEventListener('bbr_user_updated', onCustom);
 
     let bc: BroadcastChannel | null = null;
     try {
@@ -304,6 +372,7 @@ export const InventoryTab: React.FC<Props> = ({ bookings }) => {
 
     return () => {
       window.removeEventListener('storage', onStorage);
+      window.removeEventListener('bbr_user_updated', onCustom);
       bc?.close();
     };
   }, [refreshUsers]);

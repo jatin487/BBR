@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { saveBooking } from '../_lib/storage.js';
+import { saveBooking, saveUser } from '../_lib/storage.js';
 
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
@@ -48,6 +48,23 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     createdAt: new Date().toISOString(),
     status: 'confirmed',
   });
+
+  // Also register or update customer in backend users
+  try {
+    const cleanDigits = (booking.customerPhone || '').replace(/\D/g, '').slice(-10);
+    const userId = booking.userId && booking.userId !== 'guest' ? booking.userId : (cleanDigits ? `phone-${cleanDigits}` : `user-${savedBooking.id}`);
+    saveUser({
+      id: userId,
+      uid: userId,
+      name: booking.customerName || 'Customer',
+      phone: booking.customerPhone,
+      email: booking.customerEmail || undefined,
+      authProvider: isTaxi ? 'taxi_booking' : 'bike_booking',
+      createdAt: new Date().toISOString(),
+    });
+  } catch {
+    // Ignore error if user upsert fails, booking is already secured
+  }
 
   return res.status(200).json({ success: true, booking: savedBooking });
 }

@@ -1,12 +1,21 @@
-const STORAGE_KEY = 'bbr_backend_data';
+import fs from 'fs';
+import path from 'path';
 
-let inMemoryData: StoredData = { users: [], bookings: [], kycRecords: {} };
+const STORAGE_KEY = 'bbr_backend_data';
+const PERSISTENT_FILE = process.env.VERCEL
+  ? '/tmp/bbr_backend_data.json'
+  : path.join(process.cwd(), '.bbr_backend_data.json');
 
 export type StoredUser = {
   id: string;
+  uid?: string;
   name: string;
-  phone: string;
-  createdAt: string;
+  phone?: string;
+  email?: string;
+  photoURL?: string;
+  authProvider?: string;
+  kyc?: BackendKycRecord | null;
+  createdAt?: string;
 };
 
 export type StoredBooking = {
@@ -63,23 +72,42 @@ export type StoredData = {
   kycRecords?: Record<string, BackendKycRecord>;
 };
 
+let inMemoryData: StoredData = { users: [], bookings: [], kycRecords: {} };
+
 const readData = (): StoredData => {
+  // 1. Try file-based storage first (/tmp on Lambda/Vercel or local root in dev)
+  try {
+    if (fs.existsSync(PERSISTENT_FILE)) {
+      const content = fs.readFileSync(PERSISTENT_FILE, 'utf-8');
+      if (content) {
+        const parsed = JSON.parse(content) as StoredData;
+        inMemoryData = {
+          users: Array.isArray(parsed.users) ? parsed.users : inMemoryData.users,
+          bookings: Array.isArray(parsed.bookings) ? parsed.bookings : inMemoryData.bookings,
+          kycRecords: parsed.kycRecords || inMemoryData.kycRecords || {},
+        };
+        return inMemoryData;
+      }
+    }
+  } catch {
+    // Ignore file read error, proceed to fallback
+  }
+
+  // 2. Try globalThis.localStorage (if present)
   if (typeof globalThis.localStorage !== 'undefined') {
     try {
       const raw = globalThis.localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(inMemoryData));
+      if (raw) {
+        const parsed = JSON.parse(raw) as StoredData;
+        inMemoryData = {
+          users: Array.isArray(parsed.users) ? parsed.users : inMemoryData.users,
+          bookings: Array.isArray(parsed.bookings) ? parsed.bookings : inMemoryData.bookings,
+          kycRecords: parsed.kycRecords || inMemoryData.kycRecords || {},
+        };
         return inMemoryData;
       }
-      const parsed = JSON.parse(raw) as StoredData;
-      inMemoryData = {
-        users: Array.isArray(parsed.users) ? parsed.users : [],
-        bookings: Array.isArray(parsed.bookings) ? parsed.bookings : [],
-        kycRecords: parsed.kycRecords || {}
-      };
-      return inMemoryData;
     } catch {
-      return inMemoryData;
+      // Ignore
     }
   }
 
@@ -91,45 +119,94 @@ const readData = (): StoredData => {
 
 const writeData = (data: StoredData) => {
   inMemoryData = data;
+
+  // 1. Write to file system
+  try {
+    fs.writeFileSync(PERSISTENT_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch {
+    // Ignore write failure if disk is read-only
+  }
+
+  // 2. Write to globalThis.localStorage if available
   if (typeof globalThis.localStorage !== 'undefined') {
-    globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    try {
+      globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {
+      // Ignore
+    }
   }
 };
 
-export const getUsers = () => readData().users;
-export const getBookings = () => readData().bookings;
+export const getUsers = (): StoredUser[] => readData().users;
+export const getBookings = (): StoredBooking[] => readData().bookings;
 
-export const saveUser = (user: StoredUser) => {
+const normalizeDigits = (val?: string) => (val || '').replace(/\D/g, '').slice(-10);
+
+export const saveUser = (user: StoredUser): StoredUser => {
   const data = readData();
-  const existing = data.users.find((entry) => entry.phone === user.phone || entry.id === user.id);
+  const userUid = user.uid || user.id;
+  const userPhoneDigits = normalizeDigits(user.phone);
+  const userEmail = (user.email || '').trim().toLowerCase();
+
+  const existing = data.users.find((entry) => {
+    if (entry.id && entry.id === user.id) return true;
+    if (entry.uid && userUid && entry.uid === userUid) return true;
+    if (userPhoneDigits && normalizeDigits(entry.phone) === userPhoneDigits) return true;
+    if (userEmail && (entry.email || '').trim().toLowerCase() === userEmail) return true;
+    return false;
+  });
+
+  const normalizedUser: StoredUser = {
+    ...existing,
+    ...user,
+    id: user.id || existing?.id || userUid,
+    uid: userUid || existing?.uid || user.id,
+    name: user.name || existing?.name || 'Rider',
+    phone: user.phone || existing?.phone || '',
+    email: user.email || existing?.email || '',
+    createdAt: existing?.createdAt || user.createdAt || new Date().toISOString(),
+  };
+
   const nextUsers = existing
-    ? data.users.map((entry) => (entry.phone === user.phone || entry.id === user.id ? user : entry))
-    : [...data.users, user];
+    ? data.users.map((entry) => (entry === existing ? normalizedUser : entry))
+    : [...data.users, normalizedUser];
+
   const next = { ...data, users: nextUsers };
   writeData(next);
-  return user;
+  return normalizedUser;
 };
 
-export const saveBooking = (booking: StoredBooking) => {
+export const deleteUser = (uidOrId: string): boolean => {
+  const data = readData();
+  const nextUsers = data.users.filter((u) => u.id !== uidOrId && u.uid !== uidOrId);
+  if (nextUsers.length !== data.users.length) {
+    writeData({ ...data, users: nextUsers });
+    return true;
+  }
+  return false;
+};
+
+export const saveBooking = (booking: StoredBooking): StoredBooking => {
   const data = readData();
   const next = { ...data, bookings: [...data.bookings, booking] };
   writeData(next);
   return booking;
 };
 
-export const updateBooking = (id: string, updates: Partial<StoredBooking>) => {
+export const updateBooking = (id: string, updates: Partial<StoredBooking>): StoredBooking | null => {
   const data = readData();
   const nextBookings = data.bookings.map((b) => (b.id === id ? { ...b, ...updates } : b));
   writeData({ ...data, bookings: nextBookings });
   return nextBookings.find((b) => b.id === id) || null;
 };
 
-export const getUserByPhone = (phone: string) => {
-  return getUsers().find((user) => user.phone === phone);
+export const getUserByPhone = (phone: string): StoredUser | undefined => {
+  const digits = normalizeDigits(phone);
+  return getUsers().find((u) => normalizeDigits(u.phone) === digits);
 };
 
-export const getUserByUid = (uid: string) => {
-  return getUsers().find((user) => user.id === uid);
+export const getUserByUid = (uid: string): StoredUser | undefined => {
+  return getUsers().find((u) => u.id === uid || u.uid === uid);
 };
 
 export const getUserKyc = (uid: string): BackendKycRecord | null => {
@@ -155,7 +232,6 @@ export const deleteUserKyc = (uid: string): boolean => {
   return true;
 };
 
-export const clearData = () => {
+export const clearData = (): void => {
   writeData({ users: [], bookings: [], kycRecords: {} });
 };
-
