@@ -312,7 +312,7 @@ export const InventoryTab: React.FC<Props> = ({ bookings }) => {
     setSignedInUsers(local);
 
     try {
-      const res = await fetch('/api/admin/users?token=bbr-admin-2024');
+      const res = await fetch('/api/users?token=bbr-admin-2024');
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.users)) {

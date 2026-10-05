@@ -156,7 +156,7 @@ export const UsersTab: React.FC<Props> = ({ bookings }) => {
 
     // ── 1. Fetch cross-device users from server API ──────────────────────────
     try {
-      const res = await fetch(`/api/admin/users?token=${ADMIN_TOKEN}`, {
+      const res = await fetch(`/api/users?token=${ADMIN_TOKEN}`, {
         headers: { 'x-admin-token': ADMIN_TOKEN },
       });
       if (res.ok) {
@@ -268,7 +268,7 @@ export const UsersTab: React.FC<Props> = ({ bookings }) => {
     // Silently sync any found users to backend so other admin sessions have them
     try {
       aggregated.slice(0, 15).forEach((u) => {
-        fetch('/api/users/sync', {
+        fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(u),
