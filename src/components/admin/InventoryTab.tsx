@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Bike, Car, Plus, Trash2, Download, Search, Edit2, Check, X,
   Package, ChevronDown, ChevronUp, AlertTriangle, Table, LayoutList,
@@ -192,6 +192,56 @@ interface Props {
   bookings: Booking[];
 }
 
+// ── Signed-in users helper ────────────────────────────────────────────────────
+
+interface SignedInUser {
+  uid: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  authProvider?: string;
+}
+
+function loadSignedInUsers(): SignedInUser[] {
+  try {
+    const seen = new Set<string>();
+    const users: SignedInUser[] = [];
+
+    const addUser = (raw: unknown) => {
+      const u = raw as SignedInUser;
+      if (u && u.uid && !seen.has(u.uid)) {
+        seen.add(u.uid);
+        users.push(u);
+      }
+    };
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      if (
+        key.startsWith('bbr_user_session_') ||
+        key === 'bbr_user_session' ||
+        key === 'bbr-user-profile'
+      ) {
+        try { addUser(JSON.parse(localStorage.getItem(key)!)); } catch { /* skip */ }
+      }
+    }
+
+    try {
+      const bd = localStorage.getItem('bbr_backend_data');
+      if (bd) {
+        const data = JSON.parse(bd) as { users?: unknown[] };
+        if (Array.isArray(data.users)) data.users.forEach(addUser);
+      }
+    } catch { /* skip */ }
+
+    return users;
+  } catch {
+    return [];
+  }
+}
+
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export const InventoryTab: React.FC<Props> = ({ bookings }) => {
@@ -217,7 +267,50 @@ export const InventoryTab: React.FC<Props> = ({ bookings }) => {
   const [editStatus, setEditStatus] = useState<VehicleUnit['status']>('available');
   const [editNotes, setEditNotes] = useState('');
 
+  // ── Real-time signed-in users ───────────────────────────────────────────────
+  const [signedInUsers, setSignedInUsers] = useState<SignedInUser[]>(() => loadSignedInUsers());
+  const [newUserUids, setNewUserUids] = useState<Set<string>>(new Set());
+
+  const refreshUsers = useCallback(() => {
+    setSignedInUsers(loadSignedInUsers());
+  }, []);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (
+        e.key?.startsWith('bbr_user_session_') ||
+        e.key === 'bbr-user-profile' ||
+        e.key === 'bbr_backend_data'
+      ) refreshUsers();
+    };
+    window.addEventListener('storage', onStorage);
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('bbr_user_updates');
+      bc.onmessage = (evt) => {
+        if (evt.data?.type === 'USER_SIGNED_IN') {
+          const uid = evt.data.profile?.uid as string | undefined;
+          refreshUsers();
+          if (uid) {
+            setNewUserUids(prev => new Set([...prev, uid]));
+            setTimeout(() => {
+              setNewUserUids(prev => { const n = new Set(prev); n.delete(uid); return n; });
+            }, 10 * 60 * 1000);
+          }
+        }
+      };
+    } catch { /* not supported */ }
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      bc?.close();
+    };
+  }, [refreshUsers]);
+  // ───────────────────────────────────────────────────────────────────────────
+
   const activeBookings = bookings.filter(b => b.status === 'confirmed' || b.status === 'pending');
+
 
   const filteredVehicles = useMemo(() =>
     VEHICLES.filter(v => {
@@ -307,12 +400,23 @@ export const InventoryTab: React.FC<Props> = ({ bookings }) => {
     persist(units.map(u => u.unitId === unitId ? { ...u, status: newStatus } : u));
   };
 
-  const allotUnit = (unitId: string, bookingId: string) => {
+  const allotUnit = (unitId: string, value: string) => {
+    if (!value) {
+      // Unassign
+      persist(units.map(u => u.unitId === unitId
+        ? { ...u, allottedTo: undefined, status: 'available' as const }
+        : u
+      ));
+      return;
+    }
+    // value is either a booking ID or "user:<uid>"
+    const id = value.startsWith('user:') ? value.slice(5) : value;
     persist(units.map(u => u.unitId === unitId
-      ? { ...u, allottedTo: bookingId || undefined, status: bookingId ? 'booked' : 'available' }
+      ? { ...u, allottedTo: id, status: 'booked' as const }
       : u
     ));
   };
+
 
   const totalUnits  = units.length;
   const totalAvail  = units.filter(u => u.status === 'available').length;
@@ -664,30 +768,67 @@ export const InventoryTab: React.FC<Props> = ({ bookings }) => {
                       </td>
 
                       {/* Allotment / Customer */}
-                      <td className="py-3.5 px-4 min-w-[220px]">
+                      <td className="py-3.5 px-4 min-w-[240px]">
                         <div className="space-y-1">
                           <select
-                            value={unit.allottedTo || ''}
+                            value={
+                              unit.allottedTo
+                                ? activeBookings.some(b => b.id === unit.allottedTo)
+                                  ? unit.allottedTo
+                                  : `user:${unit.allottedTo}`
+                                : ''
+                            }
                             onChange={e => allotUnit(unit.unitId, e.target.value)}
-                            className="px-2 py-1 rounded-lg text-[11px] text-white bg-slate-900 border border-white/10 outline-none w-full max-w-[210px] truncate"
+                            className="px-2 py-1 rounded-lg text-[11px] text-white bg-slate-900 border border-white/10 outline-none w-full max-w-[230px] truncate"
                           >
                             <option value="">— Unassigned (Ready) —</option>
-                            {activeBookings.map(b => (
-                              <option key={b.id} value={b.id}>
-                                #{b.id.slice(-6)} · {b.customerName} ({b.pickupDate})
-                              </option>
-                            ))}
+
+                            {activeBookings.length > 0 && (
+                              <optgroup label="📋 Active Bookings">
+                                {activeBookings.map(b => (
+                                  <option key={b.id} value={b.id}>
+                                    #{b.id.slice(-6)} · {b.customerName} ({b.pickupDate})
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+
+                            {signedInUsers.length > 0 && (
+                              <optgroup label="👤 Signed-In Users">
+                                {signedInUsers.map(u => (
+                                  <option key={u.uid} value={`user:${u.uid}`}>
+                                    {newUserUids.has(u.uid) ? '🆕 ' : ''}{u.name || 'Unknown'}{u.phone ? ` · ${u.phone}` : ''}{u.email ? ` · ${u.email}` : ''}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
                           </select>
 
-                          {allottedBooking && (
-                            <div className="text-[10px] text-blue-300 font-medium flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                              <span className="font-bold">{allottedBooking.customerName}</span>
-                              <span className="text-slate-400">({allottedBooking.customerPhone})</span>
-                            </div>
-                          )}
+                          {unit.allottedTo && (() => {
+                            const booking = activeBookings.find(b => b.id === unit.allottedTo);
+                            const user = signedInUsers.find(u => u.uid === unit.allottedTo);
+                            if (booking) return (
+                              <div className="text-[10px] text-blue-300 font-medium flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                <span className="font-bold">{booking.customerName}</span>
+                                <span className="text-slate-400">({booking.customerPhone})</span>
+                              </div>
+                            );
+                            if (user) return (
+                              <div className="text-[10px] font-medium flex items-center gap-1.5 flex-wrap" style={{ color: newUserUids.has(user.uid) ? '#fb923c' : '#86efac' }}>
+                                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: newUserUids.has(user.uid) ? '#fb923c' : '#4ade80' }} />
+                                <span className="font-bold">{user.name || 'User'}</span>
+                                {user.phone && <span className="text-slate-400">{user.phone}</span>}
+                                {newUserUids.has(user.uid) && (
+                                  <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>New</span>
+                                )}
+                              </div>
+                            );
+                            return null;
+                          })()}
                         </div>
                       </td>
+
 
                       {/* Notes / Condition */}
                       <td className="py-3.5 px-4 max-w-[180px]">

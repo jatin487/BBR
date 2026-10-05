@@ -168,6 +168,33 @@ export const saveUserSession = (profile: UserProfile): void => {
       LEGACY_USER_KEY,
       JSON.stringify({ name: profile.name, phone: profile.phone, email: profile.email })
     );
+
+    // ── Admin real-time sync ──────────────────────────────────────────────────
+    // Write to the UID-scoped key that UsersTab.loadAllUsers() scans
+    if (profile.uid) {
+      localStorage.setItem(`bbr_user_session_${profile.uid}`, JSON.stringify(profile));
+    }
+
+    // Upsert the user into bbr_backend_data.users so the admin sees all users
+    try {
+      const backendRaw = localStorage.getItem('bbr_backend_data');
+      const backendData: { users?: UserProfile[] } = backendRaw ? JSON.parse(backendRaw) : {};
+      if (!Array.isArray(backendData.users)) backendData.users = [];
+      const idx = backendData.users.findIndex((u: UserProfile) => u.uid === profile.uid);
+      if (idx >= 0) {
+        backendData.users[idx] = { ...backendData.users[idx], ...profile };
+      } else {
+        backendData.users.push(profile);
+      }
+      localStorage.setItem('bbr_backend_data', JSON.stringify(backendData));
+    } catch { /* ignore */ }
+
+    // Notify the admin panel (same tab) via BroadcastChannel
+    try {
+      const bc = new BroadcastChannel('bbr_user_updates');
+      bc.postMessage({ type: 'USER_SIGNED_IN', profile });
+      bc.close();
+    } catch { /* BroadcastChannel not supported */ }
   } catch { /* quota / private-mode */ }
 };
 

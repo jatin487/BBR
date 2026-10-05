@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Users, Phone, Mail, Shield, ShieldCheck, Search,
   Download, Eye, EyeOff, Calendar, MapPin
@@ -25,34 +25,51 @@ interface UserProfile {
 function loadAllUsers(): UserProfile[] {
   try {
     const users: UserProfile[] = [];
-    // Scan localStorage for user sessions
+    const addUser = (parsed: unknown) => {
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        (parsed as UserProfile).uid &&
+        !users.some(x => x.uid === (parsed as UserProfile).uid)
+      ) {
+        users.push(parsed as UserProfile);
+      }
+    };
+
+    // Scan all localStorage keys for any matching session pattern
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!key) continue;
-      if (key.startsWith('bbr_user_session_') || key === 'bbr_user_session') {
+      const isSessionKey =
+        key.startsWith('bbr_user_session_') ||
+        key === 'bbr_user_session' ||
+        key === 'bbr-user-profile';       // <─ the key firebase.ts actually writes
+      if (isSessionKey) {
         try {
           const raw = localStorage.getItem(key);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (parsed && parsed.uid) {
-              users.push(parsed);
-            }
-          }
-        } catch { /* skip */ }
+          if (raw) addUser(JSON.parse(raw));
+        } catch { /* skip bad entries */ }
       }
     }
-    // Also check bbr_backend_data for user info
-    const raw = localStorage.getItem('bbr_backend_data');
-    if (raw) {
-      const data = JSON.parse(raw);
-      if (Array.isArray(data.users)) {
-        for (const u of data.users) {
-          if (u.uid && !users.some(x => x.uid === u.uid)) {
-            users.push(u);
-          }
+
+    // Also pull from bbr_backend_data.users (cumulative store across sessions)
+    try {
+      const raw = localStorage.getItem('bbr_backend_data');
+      if (raw) {
+        const data = JSON.parse(raw) as { users?: unknown[] };
+        if (Array.isArray(data.users)) {
+          data.users.forEach(u => addUser(u));
         }
       }
-    }
+    } catch { /* skip */ }
+
+    // Sort: most-recently created first
+    users.sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
+
     return users;
   } catch {
     return [];
@@ -109,10 +126,45 @@ export const UsersTab: React.FC<Props> = ({ bookings }) => {
   const [search, setSearch] = useState('');
   const [expandedUid, setExpandedUid] = useState<string | null>(null);
   const [hideSensitive, setHideSensitive] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+
+  const refresh = useCallback(() => {
+    setUsers(loadAllUsers());
+    setLastUpdated(new Date());
+  }, []);
 
   useEffect(() => {
-    setUsers(loadAllUsers());
-  }, []);
+    refresh();
+
+    // Cross-tab: fires when another tab writes to localStorage
+    const onStorageEvent = (e: StorageEvent) => {
+      if (
+        e.key?.startsWith('bbr_user_session_') ||
+        e.key === 'bbr_user_session' ||
+        e.key === 'bbr-user-profile' ||
+        e.key === 'bbr_backend_data'
+      ) {
+        refresh();
+      }
+    };
+    window.addEventListener('storage', onStorageEvent);
+
+    // Same-tab: fires immediately when user signs in on this tab
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('bbr_user_updates');
+      bc.onmessage = (evt) => {
+        if (evt.data?.type === 'USER_SIGNED_IN') {
+          refresh();
+        }
+      };
+    } catch { /* not supported */ }
+
+    return () => {
+      window.removeEventListener('storage', onStorageEvent);
+      bc?.close();
+    };
+  }, [refresh]);
 
   // Build user booking history from bookings list
   const getUserBookings = (user: UserProfile) =>
@@ -141,8 +193,16 @@ export const UsersTab: React.FC<Props> = ({ bookings }) => {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h2 className="text-base font-black text-white">User Information</h2>
-          <p className="text-[11px]" style={{ color: '#656C70' }}>{users.length} registered users</p>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-black text-white">User Information</h2>
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.2)' }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Live
+            </span>
+          </div>
+          <p className="text-[11px]" style={{ color: '#656C70' }}>
+            {users.length} registered users &middot; updated {lastUpdated.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+          </p>
         </div>
         <div className="flex gap-2">
           <button
