@@ -9,4 +9,4 @@ Disallow: /api/
 Disallow: /?kyc_status=
 Disallow: /?kyc_error=
 
-Sitemap: https://bbr.rental.vercel.com/sitemap.xml
+Sitemap: https://bbr-dehradun.vercel.app/sitemap.xml

@@ -6,7 +6,7 @@
 
   <!-- Homepage — highest priority -->
   <url>
-    <loc>https://bbr.rental.vercel.com/</loc>
+    <loc>https://bbr-dehradun.vercel.app/</loc>
     <lastmod>2026-10-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
@@ -14,28 +14,28 @@
 
   <!-- Fleet / Vehicle Category Pages -->
   <url>
-    <loc>https://bbr.rental.vercel.com/#bikes</loc>
+    <loc>https://bbr-dehradun.vercel.app/#bikes</loc>
     <lastmod>2026-10-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://bbr.rental.vercel.com/#scooters</loc>
+    <loc>https://bbr-dehradun.vercel.app/#scooters</loc>
     <lastmod>2026-10-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://bbr.rental.vercel.com/#cars</loc>
+    <loc>https://bbr-dehradun.vercel.app/#cars</loc>
     <lastmod>2026-10-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://bbr.rental.vercel.com/#cabs</loc>
+    <loc>https://bbr-dehradun.vercel.app/#cabs</loc>
     <lastmod>2026-10-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -43,7 +43,7 @@
 
   <!-- Locations -->
   <url>
-    <loc>https://bbr.rental.vercel.com/#locations</loc>
+    <loc>https://bbr-dehradun.vercel.app/#locations</loc>
     <lastmod>2026-10-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
@@ -51,7 +51,7 @@
 
   <!-- Offers -->
   <url>
-    <loc>https://bbr.rental.vercel.com/#offers</loc>
+    <loc>https://bbr-dehradun.vercel.app/#offers</loc>
     <lastmod>2026-10-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
@@ -59,7 +59,7 @@
 
   <!-- How It Works + FAQ -->
   <url>
-    <loc>https://bbr.rental.vercel.com/#how-it-works</loc>
+    <loc>https://bbr-dehradun.vercel.app/#how-it-works</loc>
     <lastmod>2026-10-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -67,7 +67,7 @@
 
   <!-- Contact -->
   <url>
-    <loc>https://bbr.rental.vercel.com/#contact</loc>
+    <loc>https://bbr-dehradun.vercel.app/#contact</loc>
     <lastmod>2026-10-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
