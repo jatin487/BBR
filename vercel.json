@@ -3,9 +3,16 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/((?!api/.*).*)", "destination": "/index.html" }
+    { "source": "/((?!api/.*|google[a-zA-Z0-9]+\\.html).*)", "destination": "/index.html" }
   ],
   "headers": [
+    {
+      "source": "/(google[a-zA-Z0-9]+\\.html)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" },
+        { "key": "Content-Type", "value": "text/html; charset=utf-8" }
+      ]
+    },
     {
       "source": "/robots.txt",
       "headers": [
