@@ -79,6 +79,7 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
               e.stopPropagation();
               onToggleWishlist(vehicle.id);
             }}
+            aria-label={isWishlisted ? `Remove ${vehicle.name} from saved vehicles` : `Save ${vehicle.name} to wishlist`}
             className={`absolute top-3 right-3 z-10 w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-all ${isWishlisted ? 'text-white' : ''}`}
             style={isWishlisted ? { backgroundColor: '#ef4444', boxShadow: '0 0 16px rgba(239,68,68,0.35)' } : { backgroundColor: 'rgba(10,10,10,0.72)', border: '1px solid rgba(255,255,255,0.08)', color: '#9BA1A5' }}
           >
@@ -89,12 +90,15 @@ export const VehicleCard: React.FC<VehicleCardProps> = ({
         {/* Vehicle Main Image */}
         <img
           src={vehicle.image}
-          alt={vehicle.name}
+          alt={`${vehicle.name} rental in Dehradun — BBR Bike & Car Rentals`}
           onLoad={() => setImageLoaded(true)}
           onError={(e) => {
             (e.target as HTMLImageElement).src = '/hero-bike.jpg';
             setImageLoaded(true);
           }}
+          loading="lazy"
+          width="560"
+          height="315"
           className={`w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500 ${
             imageLoaded ? 'opacity-100' : 'opacity-0'
           }`}

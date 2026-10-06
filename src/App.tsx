@@ -461,9 +461,9 @@ const AppContent: React.FC = () => {
                 <h3 className="text-lg font-bold" style={{ color: '#F4F5F2' }}>Follow on Instagram</h3>
                 <p className="text-xs" style={{ color: '#656C70' }}>Tag your travel reels, photos & stories with #RideWithBBR.</p>
                 <a
-                  href="https://instagram.com"
+                  href="https://www.instagram.com/bharat_bike_and_car_rental"
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="inline-block px-5 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-90"
                   style={{ backgroundColor: 'rgba(236,72,153,0.12)', color: '#ec4899', border: '1px solid rgba(236,72,153,0.25)' }}
                 >

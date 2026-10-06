@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+# Block admin and internal routes
+Disallow: /admin
+Disallow: /api/
+
+# Block DigiLocker OAuth redirect endpoints (not indexable pages)
+Disallow: /?kyc_status=
+Disallow: /?kyc_error=
+
+Sitemap: https://bbr.rental.vercel.com/sitemap.xml

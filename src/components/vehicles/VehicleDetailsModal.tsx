@@ -8,12 +8,7 @@ import {
   Moon,
   CheckCircle,
   Phone,
-  Fuel,
-  Gauge,
-  Sparkles,
-  ChevronRight,
-  ShieldCheck,
-  AlertCircle
+  ChevronRight
 } from 'lucide-react';
 import { Vehicle, RateType } from '../../types';
 
@@ -28,11 +23,11 @@ export const VehicleDetailsModal: React.FC<VehicleDetailsModalProps> = ({
   onClose,
   onBook
 }) => {
-  if (!vehicle) return null;
-
   const [selectedRate, setSelectedRate] = useState<RateType>('fullday');
   const [durationUnits, setDurationUnits] = useState(1);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  if (!vehicle) return null;
 
   // Price Calculation
   const getBaseRate = () => {
@@ -45,7 +40,6 @@ export const VehicleDetailsModal: React.FC<VehicleDetailsModalProps> = ({
   const baseRate = getBaseRate();
   const subtotal = baseRate * durationUnits;
   const gst = Math.round(subtotal * 0.18);
-  const deposit = 0; // Zero security deposit policy
   const totalPayable = subtotal + gst;
 
   return (

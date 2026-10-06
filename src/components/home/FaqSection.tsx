@@ -16,7 +16,11 @@ export const FaqSection: React.FC = () => {
   });
 
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
+    <section
+      id="faq"
+      className="py-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto"
+      aria-label="Frequently asked questions about BBR Rentals Dehradun"
+    >
       <div className="text-center max-w-3xl mx-auto mb-12">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-wider mb-3">
           <HelpCircle className="w-3.5 h-3.5" />

@@ -2,17 +2,229 @@
 <html lang="en" class="dark scroll-smooth">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23B8FF2C'><path d='M18.88 7.12a3 3 0 0 0-4.24 0L12 9.76l-2.64-2.64a3 3 0 1 0-4.24 4.24l7.07 7.07a3 3 0 0 0 4.24 0l6.45-6.45a3 3 0 0 0 0-4.86z'/></svg>" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         VIEWPORT & CORE META
+    ═══════════════════════════════════════════════════════════════════ -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-    <title>BBR — Bharat Bike & Car Rental | Rent Bikes, Scooters & Cars</title>
-    <meta name="description" content="Bharat Bike & Car Rental (BBR) - Premium self-drive bike, scooter, and car rentals. Hourly, daily, and night rental plans with zero hassle and verified fleet." />
-    
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Primary Title & Description -->
+    <title>BBR — Bharat Bike & Car Rentals Dehradun | Self-Drive Bikes, Scooters & Cars</title>
+    <meta name="description" content="Rent bikes, scooters & cars in Dehradun at Bharat Bike & Car Rentals (BBR). Royal Enfield, Activa, Thar 4x4 & more. Pickup from Bhauwala, ISBT, Railway Station & Jolly Grant Airport. Open 8 AM–9 PM, 7 days a week." />
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         CANONICAL URL — single source of truth for Google
+    ═══════════════════════════════════════════════════════════════════ -->
+    <link rel="canonical" href="https://bbr.rental.vercel.com/" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         INDEXING DIRECTIVES
+    ═══════════════════════════════════════════════════════════════════ -->
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         OPEN GRAPH (Facebook, WhatsApp, LinkedIn)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="BBR — Bharat Bike & Car Rentals" />
+    <meta property="og:url" content="https://bbr.rental.vercel.com/" />
+    <meta property="og:title" content="BBR — Bharat Bike & Car Rentals Dehradun | Self-Drive Bikes, Scooters & Cars" />
+    <meta property="og:description" content="Rent bikes, scooters & cars in Dehradun at Bharat Bike & Car Rentals (BBR). Royal Enfield, Activa, Thar 4x4 & more. Pickup from Bhauwala, ISBT, Railway Station & Jolly Grant Airport." />
+    <meta property="og:image" content="https://bbr.rental.vercel.com/hero-bike.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Royal Enfield Classic 350 — BBR Dehradun Bike Rentals" />
+    <meta property="og:locale" content="en_IN" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         TWITTER CARD
+    ═══════════════════════════════════════════════════════════════════ -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="BBR — Bike & Car Rentals Dehradun | Royal Enfield, Activa, Thar 4x4" />
+    <meta name="twitter:description" content="Self-drive bike, scooter & car rentals in Dehradun. BBR serves Mussoorie, Rishikesh & Dhanaulti. Lowest deposits, helmet included, instant KYC." />
+    <meta name="twitter:image" content="https://bbr.rental.vercel.com/hero-bike.jpg" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         GEO META (Local SEO signals)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <meta name="geo.region" content="IN-UT" />
+    <meta name="geo.placename" content="Dehradun, Uttarakhand, India" />
+    <meta name="geo.position" content="30.3853;77.9258" />
+    <meta name="ICBM" content="30.3853, 77.9258" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         FAVICON (inline SVG — fast, no extra HTTP request)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23FF6A00'><circle cx='12' cy='12' r='3'/><path d='M6.343 6.343a8 8 0 1 0 11.314 11.314A8 8 0 0 0 6.343 6.343zM4 12a8 8 0 1 1 16 0A8 8 0 0 1 4 12z'/></svg>" />
+    <link rel="apple-touch-icon" href="/hero-bike.jpg" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         PERFORMANCE — FONT LOADING
+         preconnect before preload to open DNS/TLS fast.
+         Only load the weights actually used.
+    ═══════════════════════════════════════════════════════════════════ -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Outfit: weights 400,600,700,900 only — removed 300,500,800 to reduce transfer -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         PERFORMANCE — PRELOAD CRITICAL HERO IMAGE
+         Tells browser to fetch the hero image immediately (LCP asset).
+    ═══════════════════════════════════════════════════════════════════ -->
+    <link rel="preload" as="image" href="/hero-bike.jpg" fetchpriority="high" />
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         STRUCTURED DATA — Organization + LocalBusiness + WebSite
+    ═══════════════════════════════════════════════════════════════════ -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": ["LocalBusiness", "AutoRental"],
+          "@id": "https://bbr.rental.vercel.com/#business",
+          "name": "Bharat Bike And Car Rentals",
+          "alternateName": "BBR Dehradun",
+          "description": "Dehradun's premier self-drive motorcycle, scooter, and 4x4 car rental agency. Serving tourists visiting Mussoorie, Dhanaulti, Rishikesh and surrounding Uttarakhand destinations.",
+          "url": "https://bbr.rental.vercel.com/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://bbr.rental.vercel.com/hero-bike.jpg",
+            "width": 1200,
+            "height": 630
+          },
+          "image": "https://bbr.rental.vercel.com/hero-bike.jpg",
+          "telephone": ["+91-8507067716", "+91-7091431158", "0135-416-4070"],
+          "email": "bharatbikerentaldehradun@gmail.com",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Bhauwala",
+            "addressLocality": "Dehradun",
+            "addressRegion": "Uttarakhand",
+            "postalCode": "248007",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 30.3853,
+            "longitude": 77.9258
+          },
+          "openingHoursSpecification": [
+            {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+              "opens": "08:00",
+              "closes": "21:00"
+            }
+          ],
+          "priceRange": "₹₹",
+          "currenciesAccepted": "INR",
+          "paymentAccepted": "Cash, UPI, Google Pay, Credit Card",
+          "areaServed": [
+            "Dehradun",
+            "Mussoorie",
+            "Rishikesh",
+            "Haridwar",
+            "Dhanaulti",
+            "Chakrata",
+            "Uttarakhand"
+          ],
+          "hasMap": "https://maps.google.com/?q=Bharat+Bike+And+Car+Rentals+Bhauwala+Dehradun",
+          "sameAs": [
+            "https://www.instagram.com/bharat_bike_and_car_rental"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://bbr.rental.vercel.com/#website",
+          "url": "https://bbr.rental.vercel.com/",
+          "name": "BBR — Bharat Bike & Car Rentals Dehradun",
+          "description": "Self-drive bike, scooter and car rentals in Dehradun, Uttarakhand",
+          "publisher": {
+            "@id": "https://bbr.rental.vercel.com/#business"
+          },
+          "inLanguage": "en-IN"
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://bbr.rental.vercel.com/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "Where is Bharat Bike and Car Rentals located in Dehradun?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Our main registered office and hub is located at Bhauwala, Uttarakhand 248007 (near Suddhowala / UPES route). We also provide doorstep delivery and pickup across ISBT Dehradun, Dehradun Railway Station, Jolly Grant Airport (DED), and Rajpur Road."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What are your operational timings and opening hours?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "We are open 7 days a week from 8:00 AM to 9:00 PM. Drop-offs and emergency roadside assistance operate 24/7 on call."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What documents are required to rent a vehicle from BBR Dehradun?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "An Original Driving License (valid for 2-wheelers or 4-wheelers) and one Government ID proof (Aadhaar Card, Passport, or Voter ID). DigiLocker and mParivahan digital verified documents are also accepted."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What is the security deposit policy and how soon is it refunded?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Our security deposit starts from just ₹500 for commuter scooties, ₹1,000–₹2,000 for Royal Enfields and TVS bikes, and ₹2,500–₹5,000 for cars. Deposit is refunded instantly to your GPay/UPI/Bank within 30 minutes after return."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can I take BBR bikes and cars to Mussoorie, Dhanaulti, Rishikesh, or Chakrata?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes! All our bikes, scooters, and 4x4 Thar/cars have all-Uttarakhand commercial tourist permits and are perfectly tuned for hill climbs, hairpin bends, and highway cruising."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Are ISI helmets provided with two-wheeler rentals?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes! Every bike and scooter rental includes 1 complimentary sanitized ISI-certified helmet. An extra pillion helmet is available for just ₹100 or free on special student offers."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What happens in case of a breakdown or puncture?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "We provide 24/7 Roadside Assistance across Dehradun and uphill routes. Simply dial 0135-416-4070 or +91-8507067716 / +91-7091431158 and our mechanic team will assist or replace the vehicle immediately."
+              }
+            }
+          ]
+        },
+        {
+          "@type": "BreadcrumbList",
+          "@id": "https://bbr.rental.vercel.com/#breadcrumb",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Home",
+              "item": "https://bbr.rental.vercel.com/"
+            }
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
-  <body class="bg-[#080A0B] text-[#F4F5F2] font-sans antialiased selection:bg-[#B8FF2C] selection:text-[#080A0B] overflow-x-hidden">
+  <body class="bg-[#080A0B] text-[#F4F5F2] font-sans antialiased selection:bg-[#FF6A00] selection:text-white overflow-x-hidden">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

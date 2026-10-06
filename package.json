@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "optimise-images": "node scripts/optimise-images.mjs",
+    "optimise-root-images": "node scripts/optimise-root-images.mjs",
+    "optimise-all-images": "node scripts/optimise-images.mjs && node scripts/optimise-root-images.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
@@ -35,6 +38,7 @@
     "autoprefixer": "^10.5.4",
     "oxlint": "^1.79.0",
     "postcss": "^8.5.26",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"

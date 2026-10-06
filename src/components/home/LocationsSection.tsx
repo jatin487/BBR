@@ -8,7 +8,11 @@ interface LocationsSectionProps {
 
 export const LocationsSection: React.FC<LocationsSectionProps> = ({ onSelectCity }) => {
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <section
+      id="locations"
+      className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto"
+      aria-label="BBR Rental pickup locations in Dehradun"
+    >
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-bold uppercase tracking-wider mb-3">
@@ -34,8 +38,11 @@ export const LocationsSection: React.FC<LocationsSectionProps> = ({ onSelectCity
             {/* Background Image */}
             <img
               src={hub.image}
-              alt={hub.city}
+              alt={`BBR vehicle rental pickup point at ${hub.city}, Uttarakhand`}
               className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-700 brightness-[0.65]"
+              loading="lazy"
+              width="800"
+              height="450"
             />
 
             {/* Gradient Overlay */}

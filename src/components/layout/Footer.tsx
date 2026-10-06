@@ -104,7 +104,7 @@ export const Footer: React.FC<FooterProps> = ({
                 <Navigation className="w-4 h-4" />
                 <span>Get Directions: Bhauwala, Uttarakhand 248007</span>
               </a>
-              <a href="https://instagram.com" target="_blank" rel="noreferrer"
+              <a href="https://www.instagram.com/bharat_bike_and_car_rental" target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 font-semibold transition-colors" style={{ color: '#ec4899' }}
               >
                 <InstagramIcon className="w-4 h-4" />

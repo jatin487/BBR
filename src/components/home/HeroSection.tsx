@@ -36,16 +36,24 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onNavigateToCatalog
 }) => {
   return (
-    <section className="relative min-h-[96vh] flex flex-col justify-between pt-6 pb-12 overflow-hidden" style={{ backgroundColor: '#0A0A0A' }}>
+    <section
+      className="relative min-h-[96vh] flex flex-col justify-between pt-6 pb-12 overflow-hidden"
+      style={{ backgroundColor: '#0A0A0A' }}
+      aria-label="Hero section — BBR Bike &amp; Car Rentals Dehradun"
+    >
       
       {/* ═══════════════════ DARK ATMOSPHERIC BACKGROUND ═══════════════════ */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none">
         {/* Hero bike image — darkened for contrast */}
         <img
           src="/hero-bike.jpg"
-          alt="Royal Enfield Classic 350 Chrome Studio Showcase"
+          alt="Royal Enfield Classic 350 Chrome — BBR Bike Rentals Dehradun hero image"
           className="w-full h-full object-cover object-center lg:object-[center_36%] transition-all duration-700"
           style={{ filter: 'brightness(0.28) contrast(1.1) saturate(0.8)', opacity: 1 }}
+          width="1920"
+          height="1080"
+          fetchPriority="high"
+          decoding="sync"
         />
 
         {/* Top gradient — fade to dark bg */}
@@ -111,7 +119,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           >
             Welcome to{' '}
             <strong style={{ color: '#F4F5F2', fontWeight: 700 }}>Bharat Bike And Car Rentals</strong>{' '}
-            in Bhauwala, Dehradun. Self-drive Royal Enfield Classic 350, GT 650, Activa &amp; Thar 4x4 for Mussoorie &amp; Himalayan road trips.
+            in Bhauwala, Dehradun. Self-drive Royal Enfield Classic 350, GT 650, Activa {'&'} Thar 4x4 for Mussoorie {'&'} Himalayan road trips.
           </motion.p>
 
           {/* CTA Buttons */}
