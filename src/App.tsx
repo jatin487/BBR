@@ -22,6 +22,13 @@ import { AuthModal } from './components/auth/AuthModal';
 import { DigiLockerModal } from './components/booking/DigiLockerModal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { UserProfileBanner } from './components/auth/UserProfileBanner';
+import { PrivacyPolicy } from './components/legal/PrivacyPolicy';
+import { TermsOfService } from './components/legal/TermsOfService';
+import { RefundPolicy } from './components/legal/RefundPolicy';
+import { CookiePolicy } from './components/legal/CookiePolicy';
+import { CookieConsentBanner } from './components/legal/CookieConsentBanner';
+import { NotFoundView } from './components/common/NotFoundView';
+import { EnquiryForm } from './components/common/EnquiryForm';
 import {
   firebaseAuthService,
   loadUserSession,
@@ -60,6 +67,7 @@ const AppContent: React.FC = () => {
   const [isPriceListOpen, setIsPriceListOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isDigiLockerModalOpen, setIsDigiLockerModalOpen] = useState(false);
+  const [isCookieSettingsOpen, setIsCookieSettingsOpen] = useState(false);
   const [selectedVehicleForDetails, setSelectedVehicleForDetails] = useState<Vehicle | null>(null);
   const [bookingVehicle, setBookingVehicle] = useState<Vehicle | null>(null);
   const [bookingRateType, setBookingRateType] = useState<RateType>('fullday');
@@ -487,7 +495,75 @@ const AppContent: React.FC = () => {
                 <p className="text-sm font-bold" style={{ color: '#60a5fa' }}>bharatbikerentaldehradun@gmail.com</p>
               </div>
             </div>
+
+            {/* Direct Rental Enquiry & Booking Request Form */}
+            <div className="mt-16">
+              <EnquiryForm
+                onNavigateToTerms={() => {
+                  setCurrentTab('terms');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onNavigateToPrivacy={() => {
+                  setCurrentTab('privacy');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
+            </div>
           </section>
+        )}
+
+        {/* VIEW 9: PRIVACY POLICY */}
+        {currentTab === 'privacy' && (
+          <PrivacyPolicy
+            onBack={() => {
+              setCurrentTab('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
+
+        {/* VIEW 10: TERMS OF SERVICE */}
+        {currentTab === 'terms' && (
+          <TermsOfService
+            onBack={() => {
+              setCurrentTab('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
+
+        {/* VIEW 11: REFUND & CANCELLATION */}
+        {currentTab === 'refund' && (
+          <RefundPolicy
+            onBack={() => {
+              setCurrentTab('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
+
+        {/* VIEW 12: COOKIE POLICY */}
+        {currentTab === 'cookies' && (
+          <CookiePolicy
+            onBack={() => {
+              setCurrentTab('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
+
+        {/* 404 FALLBACK FOR UNKNOWN TABS */}
+        {!['home', 'bikes', 'scooters', 'cars', 'cabs', 'locations', 'offers', 'how-it-works', 'contact', 'admin', 'privacy', 'terms', 'refund', 'cookies'].includes(currentTab) && (
+          <NotFoundView
+            onGoHome={() => {
+              setCurrentTab('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onExploreFleet={() => {
+              setCurrentTab('bikes');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
         )}
       </main>
 
@@ -514,6 +590,21 @@ const AppContent: React.FC = () => {
         initialRateType={bookingRateType}
         initialCity={selectedCity}
         initialDuration={bookingDuration}
+        onNavigateToTerms={() => {
+          setIsBookingModalOpen(false);
+          setCurrentTab('terms');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onNavigateToPrivacy={() => {
+          setIsBookingModalOpen(false);
+          setCurrentTab('privacy');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onNavigateToRefund={() => {
+          setIsBookingModalOpen(false);
+          setCurrentTab('refund');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
       <TaxiBookingModal
@@ -581,6 +672,17 @@ const AppContent: React.FC = () => {
         onSelectCity={(city) => {
           setSelectedCity(city);
           setCurrentTab('bikes');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenCookieSettings={() => setIsCookieSettingsOpen(true)}
+      />
+
+      {/* Accessible Cookie Consent Banner & Preferences Modal */}
+      <CookieConsentBanner
+        forceOpen={isCookieSettingsOpen}
+        onCloseForceOpen={() => setIsCookieSettingsOpen(false)}
+        onNavigateToPolicy={() => {
+          setCurrentTab('cookies');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
       />

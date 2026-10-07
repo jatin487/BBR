@@ -29,6 +29,9 @@ interface BookingModalProps {
   initialRateType?: RateType;
   initialCity?: string;
   initialDuration?: number;
+  onNavigateToTerms?: () => void;
+  onNavigateToPrivacy?: () => void;
+  onNavigateToRefund?: () => void;
 }
 
 export const BookingModal: React.FC<BookingModalProps> = ({
@@ -37,7 +40,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   initialVehicle,
   initialRateType = 'fullday',
   initialCity = 'Rishikesh',
-  initialDuration = 1
+  initialDuration = 1,
+  onNavigateToTerms,
+  onNavigateToPrivacy,
+  onNavigateToRefund
 }) => {
   const { showToast } = useToast();
 
@@ -83,6 +89,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [dlNumber, setDlNumber] = useState(initialStoredKyc?.dlNumber || '');
   const [aadhaarNumber, setAadhaarNumber] = useState(initialStoredKyc?.aadhaarNumber || '');
 
+  // Step 5: Billing, Consents & Submission
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<PromoOffer | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'pay_at_pickup' | 'razorpay'>('pay_at_pickup');
+  const [termsConsent, setTermsConsent] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bookingId, setBookingId] = useState('');
+
   useEffect(() => {
     if (isOpen) {
       setCurrentStep(1);
@@ -92,7 +107,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
       const activeSession = loadUserSession();
       const activeKyc = activeSession?.kyc || loadUserKyc(activeSession?.uid);
-      // Always use real session data — never fall back to a hardcoded name
       setCustomerName(activeSession?.name || '');
       setCustomerPhone(
         activeSession?.phone
@@ -109,16 +123,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         setDlNumber('');
         setAadhaarNumber('');
       }
+      setTermsConsent(false);
+      setMarketingConsent(false);
+      setIsSubmitting(false);
     }
   }, [isOpen, initialRateType, initialDuration, initialCity]);
-
-
-
-  // Step 5: Billing & Promo
-  const [promoCodeInput, setPromoCodeInput] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState<PromoOffer | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'pay_at_pickup'>('pay_at_pickup');
-  const [bookingId, setBookingId] = useState('');
 
   if (!isOpen || !vehicle) return null;
 
@@ -144,8 +153,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   const taxableAmount = Math.max(0, subtotal + extrasCost - discount);
   const gst = Math.round(taxableAmount * 0.18);
-  const deposit = 0; // Zero Security Deposit policy for bike & scooty rentals
+  const deposit = vehicle.securityDeposit || 0;
   const totalAmountToPay = taxableAmount + gst;
+  const totalPayableAtPickup = taxableAmount + gst + deposit;
 
   const handleApplyPromo = () => {
     const found = OFFERS.find((o) => o.code.toUpperCase() === promoCodeInput.trim().toUpperCase());
@@ -158,6 +168,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   };
 
   const handleConfirmBooking = async () => {
+    if (!termsConsent) {
+      showToast('Please agree to the Terms of Service and acknowledge the Privacy Policy to proceed.', 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
     const newId = `BBR-${Math.floor(100000 + Math.random() * 900000)}`;
     const userFromStorage = JSON.parse(localStorage.getItem('bbr-user') || 'null');
     const bookingRecord = {
@@ -174,12 +190,18 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       returnTime,
       rateType,
       duration,
-      totalAmount: totalAmountToPay,
+      totalAmount: totalPayableAtPickup,
+      rentalAmount: totalAmountToPay,
+      securityDeposit: deposit,
       customerName,
       customerPhone,
+      customerEmail,
       paymentMethod,
+      termsAccepted: true,
+      marketingConsent,
+      paymentConfirmed: false,
       createdAt: new Date().toISOString(),
-      status: 'confirmed'
+      status: 'pending_verification'
     };
 
     try {
@@ -190,12 +212,15 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         const response = await fetch('/api/bookings/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...bookingRecord, userId: bookingRecord.userId.replace(/^\+91/, '') })
+          body: JSON.stringify({
+            ...bookingRecord,
+            userId: bookingRecord.userId.replace(/^\+91/, '')
+          })
         });
 
         const data = await response.json();
         if (!response.ok || !data.success) {
-          throw new Error(data.message || 'Unable to create booking');
+          throw new Error(data.message || 'Unable to submit booking request');
         }
 
         const savedBookings = JSON.parse(localStorage.getItem('bbr-bookings') || '[]');
@@ -208,18 +233,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       savedBookings.push(bookingRecord);
       localStorage.setItem('bbr-bookings', JSON.stringify(savedBookings));
       setBookingId(newId);
-      showToast(error instanceof Error ? error.message : 'Saved locally and ready for sync', 'info');
+      showToast(error instanceof Error ? error.message : 'Request saved locally and queued for verification', 'info');
+    } finally {
+      setIsSubmitting(false);
     }
 
     setCurrentStep(6);
-
-    confetti({
-      particleCount: 120,
-      spread: 70,
-      origin: { y: 0.6 }
-    });
-
-    showToast(`Booking ${newId} confirmed successfully!`, 'success');
+    showToast(`Booking request ${newId} received! Our hub team will verify vehicle readiness.`, 'success');
   };
 
   const steps = [
@@ -227,8 +247,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     'Schedule & Add-ons',
     'Rider Details',
     'DigiLocker KYC',
-    'Payment',
-    'Confirmed'
+    'Review & Pay',
+    'Request Received'
   ];
 
   return (
@@ -729,58 +749,173 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   </div>
                 )}
                 <div className="flex justify-between text-slate-400">
-                  <span>GST (18%):</span>
+                  <span>Applicable GST (18%):</span>
                   <span>₹{gst}</span>
                 </div>
-                <div className="flex justify-between text-emerald-400 border-t border-white/5 pt-2 font-bold">
-                  <span>Security Deposit:</span>
-                  <span className="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-xs border border-emerald-500/20">₹0 (Waived)</span>
+                <div className="flex justify-between text-slate-300 border-t border-white/5 pt-2">
+                  <span>Rental Total (Taxes Incl.):</span>
+                  <span className="font-bold text-white">₹{totalAmountToPay}</span>
+                </div>
+                <div className="flex justify-between items-center text-amber-300 border-t border-white/5 pt-2 font-bold">
+                  <div>
+                    <span>Refundable Security Deposit:</span>
+                    <span className="block text-[10px] text-slate-400 font-normal">
+                      100% refunded via UPI upon vehicle return
+                    </span>
+                  </div>
+                  <span className="bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded text-xs border border-amber-500/20">
+                    {deposit > 0 ? `₹${deposit}` : '₹0 (Waived)'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-baseline border-t border-white/10 pt-2 text-sm font-black text-white">
-                  <span>Grand Total:</span>
-                  <span className="text-xl text-orange-400">₹{totalAmountToPay}</span>
+                  <div>
+                    <span>Total Due at Hub Handover:</span>
+                    <span className="block text-[10px] text-slate-400 font-normal">Rent + Refundable Deposit</span>
+                  </div>
+                  <span className="text-xl text-orange-400">₹{totalPayableAtPickup}</span>
                 </div>
+              </div>
+
+              {/* Zero Hidden Fees & Cancellation Policy Notice */}
+              <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-1 text-[11px] text-slate-300">
+                <div className="font-bold text-white flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>100% Transparent Tariffs & Free Cancellation</span>
+                </div>
+                <p className="text-slate-400 leading-relaxed">
+                  No hidden convenience or platform surge fees. Free cancellation up to 6 hours before pickup time. Complimentary sanitized ISI helmet included. Fuel is on actuals (return at same level).
+                </p>
               </div>
 
               {/* Payment Method Selector */}
               <div>
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-3">
-                  Payment Mode
+                  Payment Mode Selection
                 </label>
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Option 1: Pay at Hub (Active) */}
                   <div
                     onClick={() => setPaymentMethod('pay_at_pickup')}
                     className={`p-4 rounded-2xl border cursor-pointer transition-all ${
                       paymentMethod === 'pay_at_pickup'
-                        ? 'bg-orange-500/15 border-orange-500 text-white'
-                        : 'bg-slate-900/50 border-white/5 text-slate-400'
+                        ? 'bg-orange-500/15 border-orange-500 text-white shadow-md'
+                        : 'bg-slate-900/50 border-white/5 text-slate-400 hover:border-white/20'
                     }`}
                   >
-                    <ShieldCheck className="w-5 h-5 text-emerald-400 mb-1" />
-                    <div className="text-xs font-bold">Pay at Hub Pickup</div>
-                    <div className="text-[10px] text-slate-400">Free booking • Zero advance required</div>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-bold text-white">Pay at Hub (Recommended)</span>
+                      </div>
+                      <span className="text-[10px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded font-bold">Active</span>
+                    </div>
+                    <div className="text-[11px] text-slate-300">Cash or UPI upon vehicle handover & inspection at Bhauwala. Zero advance required.</div>
                   </div>
+
+                  {/* Option 2: Razorpay Online (Inactive / In Setup) */}
+                  <div
+                    onClick={() => {
+                      setPaymentMethod('razorpay');
+                      showToast('Online payment gateway currently in scheduled setup. Please use Pay at Hub (No advance required).', 'info');
+                    }}
+                    className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                      paymentMethod === 'razorpay'
+                        ? 'bg-blue-500/15 border-blue-500 text-white shadow-md'
+                        : 'bg-slate-900/30 border-white/5 text-slate-400 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-white">Razorpay Online Gateway</span>
+                      <span className="text-[10px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded font-bold">In Setup</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">UPI, Cards & NetBanking integration in progress. Inactive until merchant activation.</div>
+                  </div>
+                </div>
+
+                {paymentMethod === 'razorpay' && (
+                  <div className="mt-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+                    ℹ️ Razorpay credentials are currently being provisioned. Your booking request will be processed under <strong>Pay at Hub</strong> without taking online payment right now.
+                  </div>
+                )}
+              </div>
+
+              {/* Explicit Separate Consents */}
+              <div className="pt-2 space-y-3 border-t border-white/10">
+                {/* Mandatory Consent */}
+                <div className="flex items-start gap-2.5">
+                  <input
+                    id="booking-terms-consent"
+                    type="checkbox"
+                    required
+                    checked={termsConsent}
+                    onChange={(e) => setTermsConsent(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded text-orange-500 accent-orange-500 cursor-pointer shrink-0"
+                  />
+                  <label htmlFor="booking-terms-consent" className="text-xs text-slate-300 leading-relaxed cursor-pointer select-none">
+                    I have read and agree to the{' '}
+                    <button
+                      type="button"
+                      onClick={onNavigateToTerms}
+                      className="text-orange-400 hover:text-orange-300 underline font-bold"
+                    >
+                      Terms of Service
+                    </button>
+                    ,{' '}
+                    <button
+                      type="button"
+                      onClick={onNavigateToRefund}
+                      className="text-orange-400 hover:text-orange-300 underline font-bold"
+                    >
+                      Refund & Cancellation Policy
+                    </button>
+                    , and acknowledge the{' '}
+                    <button
+                      type="button"
+                      onClick={onNavigateToPrivacy}
+                      className="text-orange-400 hover:text-orange-300 underline font-bold"
+                    >
+                      Privacy Policy
+                    </button>
+                    .{' '}
+                    <span className="text-orange-400 font-bold" aria-hidden="true">*</span>
+                  </label>
+                </div>
+
+                {/* Optional Marketing Consent */}
+                <div className="flex items-start gap-2.5">
+                  <input
+                    id="booking-marketing-consent"
+                    type="checkbox"
+                    checked={marketingConsent}
+                    onChange={(e) => setMarketingConsent(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded text-orange-500 accent-orange-500 cursor-pointer shrink-0"
+                  />
+                  <label htmlFor="booking-marketing-consent" className="text-xs text-slate-400 leading-relaxed cursor-pointer select-none">
+                    Send me occasional road trip updates and promo discount codes via WhatsApp/SMS.{' '}
+                    <span className="text-slate-500">(Optional — booking is processed without this consent).</span>
+                  </label>
                 </div>
               </div>
             </div>
           )}
 
-          {/* STEP 6: CONFIRMATION RECEIPT */}
+          {/* STEP 6: BOOKING REQUEST SUBMITTED (HONEST STATUS) */}
           {currentStep === 6 && (
             <div className="text-center space-y-6 py-4">
-              <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto ring-8 ring-emerald-500/10 animate-bounce">
+              <div className="w-16 h-16 rounded-full bg-orange-500/20 text-orange-400 flex items-center justify-center mx-auto ring-8 ring-orange-500/10">
                 <CheckCircle2 className="w-9 h-9" />
               </div>
 
               <div>
-                <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">
-                  Ride Booked Successfully
+                <span className="text-xs font-bold uppercase tracking-widest text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                  Booking Request Received • Under Hub Review
                 </span>
-                <h3 className="text-2xl sm:text-3xl font-black text-white font-heading mt-1">
-                  Ready to Ride, {customerName.split(' ')[0]}!
+                <h3 className="text-2xl sm:text-3xl font-black text-white font-heading mt-3">
+                  Reservation Request Received, {customerName.split(' ')[0] || 'Rider'}!
                 </h3>
-                <p className="text-xs text-slate-300 mt-1">
-                  Booking Reference ID: <strong className="text-orange-400 font-mono text-sm">{bookingId}</strong>
+                <p className="text-xs sm:text-sm text-slate-300 mt-2 max-w-md mx-auto leading-relaxed">
+                  Booking Reference: <strong className="text-orange-400 font-mono text-sm">{bookingId}</strong>.
+                  No advance payment has been deducted. Our Bhauwala hub team will verify vehicle readiness and contact you via call or WhatsApp to confirm your ride.
                 </p>
               </div>
 
@@ -788,11 +923,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               <div className="p-5 rounded-3xl bg-slate-950 border border-white/10 text-left space-y-4 max-w-lg mx-auto">
                 <div className="flex justify-between items-center border-b border-white/10 pb-3">
                   <div>
-                    <span className="text-xs text-slate-400">Assigned Vehicle</span>
+                    <span className="text-xs text-slate-400">Requested Ride</span>
                     <h4 className="text-sm font-bold text-white">{vehicle.name}</h4>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    Confirmed
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    Pending Verification
                   </span>
                 </div>
 
@@ -814,18 +949,18 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     <p className="font-bold text-slate-200">{pickupDate} @ {pickupTime}</p>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-[10px] uppercase font-semibold">Total Amount Due</span>
-                    <p className="font-bold text-orange-400">₹{totalAmountToPay} (Zero Deposit)</p>
+                    <span className="text-slate-500 text-[10px] uppercase font-semibold">Payable at Hub</span>
+                    <p className="font-bold text-orange-400">₹{totalPayableAtPickup} (Incl. Deposit)</p>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-[10px] uppercase font-semibold">Emergency Helpline</span>
+                    <span className="text-slate-500 text-[10px] uppercase font-semibold">Bhauwala Hub Phone</span>
                     <p className="font-bold text-emerald-400">+91 8507067716</p>
                   </div>
 
                   <div className="col-span-2 pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>DigiLocker Verified (DL: {dlNumber} • UID: {aadhaarNumber})</span>
+                      <span>DigiLocker Verified (DL: {dlNumber || 'On Handover'})</span>
                     </div>
                     {verifiedKyc?.digilockerDocId && (
                       <span className="text-[10px] font-mono text-slate-400">
@@ -845,7 +980,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download / Print Invoice</span>
+                  <span>Download / Print Request</span>
                 </button>
                 <a
                   href="https://maps.google.com/?q=Bhauwala,Dehradun,Uttarakhand+248007"
@@ -857,13 +992,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   <span>Navigate to Pickup Hub</span>
                 </a>
                 <a
-                  href={`https://wa.me/918507067716?text=Hi%20BBR,%20my%20booking%20ID%20is%20${bookingId}.%20Please%20send%20pickup%20location%20map.`}
+                  href={`https://wa.me/918507067716?text=Hi%20BBR,%20I%20have%20submitted%20booking%20request%20${bookingId}%20for%20${encodeURIComponent(vehicle.name)}.%20Please%20confirm%20availability.`}
                   target="_blank"
                   rel="noreferrer"
                   className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-2"
                 >
                   <Share2 className="w-4 h-4" />
-                  <span>WhatsApp Trip Support</span>
+                  <span>Chat on WhatsApp</span>
                 </a>
               </div>
             </div>
@@ -909,10 +1044,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           {currentStep === 5 && (
             <button
               onClick={handleConfirmBooking}
-              className="px-7 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 flex items-center gap-1.5 hover:scale-105 transition-all"
+              disabled={isSubmitting}
+              className="px-7 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-500/25 flex items-center gap-1.5 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Confirm Booking</span>
+              <span>{isSubmitting ? 'Submitting Request...' : 'Submit Booking Request'}</span>
             </button>
           )}
 

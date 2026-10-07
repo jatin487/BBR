@@ -43,7 +43,7 @@ export const TestimonialsSection: React.FC = () => {
           Stories from the <span className="gradient-text-orange">Open Road</span>
         </h2>
         <p className="text-sm sm:text-base text-slate-400 mt-3">
-          Over 5,000+ satisfied travelers explore India every month on BBR bikes, scooters & cars.
+          Traveler reflections and community feedback from road trips across Dehradun, Mussoorie, and Uttarakhand.
         </p>
       </div>
 
@@ -85,16 +85,17 @@ export const TestimonialsSection: React.FC = () => {
             {/* Rider Profile Card & Controls */}
             <div className="pt-6 border-t border-white/10 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3.5">
-                <img
-                  src={activeReview.avatar}
-                  alt={activeReview.name}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-orange-500/60 shadow-lg"
-                />
+                <div
+                  aria-hidden="true"
+                  className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center font-black text-white text-sm shadow-lg border border-orange-400/40 shrink-0"
+                >
+                  {activeReview.name.slice(0, 2).toUpperCase()}
+                </div>
                 <div>
                   <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
                     <span>{activeReview.name}</span>
                     <CheckCircle className="w-4 h-4 text-emerald-400" />
-                    <span className="text-[10px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.2 rounded font-bold">Verified Rider</span>
+                    <span className="text-[10px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.2 rounded font-bold">Rider Review</span>
                   </h4>
                   <p className="text-xs text-slate-400">{activeReview.city}</p>
                   <p className="text-xs text-orange-400 font-semibold mt-0.5">

@@ -75,16 +75,28 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // ESC key closes mobile menu
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMobileMenuOpen(false);
+        setCityDropdownOpen(false);
+        setUserDropdownOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const navLinks = [
     { id: 'home', label: 'Home' },
-    { id: 'cabs', label: 'Rental Cabs' },
     { id: 'bikes', label: 'Bikes & Cruisers' },
     { id: 'scooters', label: 'Scooters' },
     { id: 'cars', label: 'Cars & Thar' },
+    { id: 'cabs', label: 'Rental Cabs' },
     { id: 'locations', label: 'Dehradun Hubs' },
     { id: 'offers', label: 'Offers' },
-    { id: 'contact', label: 'Contact' },
-    { id: 'admin', label: '⚙ Admin' },
+    { id: 'contact', label: 'Contact & Enquiry' },
   ];
 
 
@@ -140,10 +152,15 @@ export const Navbar: React.FC<NavbarProps> = ({
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
 
-          {/* Logo */}
-          <div
-            onClick={() => onNavigate('home')}
-            className="flex items-center gap-3 cursor-pointer group select-none"
+          {/* Accessible Logo Link */}
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              onNavigate('home');
+            }}
+            aria-label="Bharat Bike and Car Rentals Home"
+            className="flex items-center gap-3 group select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded-xl"
           >
             <div
               className="relative w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform"
@@ -181,7 +198,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 Bharat Bike and Car Rentals
               </p>
             </div>
-          </div>
+          </a>
 
           {/* Hub Indicator — Bhauwala Only */}
           <div className="relative hidden lg:block">
@@ -402,7 +419,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg"
+              aria-expanded={mobileMenuOpen}
+              aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              className="p-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
               style={{ backgroundColor: 'rgba(26,26,26,0.7)', border: '1px solid #2A2A2A', color: '#9BA1A5' }}
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

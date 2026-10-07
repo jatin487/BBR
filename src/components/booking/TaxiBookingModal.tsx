@@ -147,7 +147,7 @@ export const TaxiBookingModal: React.FC<TaxiBookingModalProps> = ({
       paymentMethod,
       type: 'taxi' as const,
       createdAt: new Date().toISOString(),
-      status: 'confirmed',
+      status: 'pending_verification',
     };
 
     let confirmedId = newId;
@@ -188,12 +188,7 @@ export const TaxiBookingModal: React.FC<TaxiBookingModalProps> = ({
 
     setBookingId(confirmedId);
     setStep(6);
-    showToast('Taxi booked successfully! 🎉', 'success');
-    confetti({
-      particleCount: 120,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
+    showToast('Taxi request received! Our coordinator will contact you.', 'success');
     setIsSubmitting(false);
   };
 
@@ -624,12 +619,15 @@ export const TaxiBookingModal: React.FC<TaxiBookingModalProps> = ({
                 <CheckCircle2 className="w-10 h-10" style={{ color: '#22c55e' }} />
               </div>
               <div>
-                <h3 className="text-2xl font-black text-white">Taxi Booked!</h3>
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                  Request Received • Pending Driver Assignment
+                </span>
+                <h3 className="text-2xl font-black text-white mt-3">Taxi Request Logged!</h3>
                 <p className="text-sm mt-2" style={{ color: '#9BA1A5' }}>
-                  Your booking <span className="font-bold" style={{ color: '#FF6A00' }}>{bookingId}</span> is confirmed.
+                  Your request ID is <span className="font-bold text-orange-400 font-mono">{bookingId}</span>. No online payment was charged.
                 </p>
-                <p className="text-sm mt-1" style={{ color: '#9BA1A5' }}>
-                  We'll call <span className="text-white font-semibold">+91 {customerPhone}</span> to assign your driver.
+                <p className="text-xs mt-1 text-slate-300">
+                  Our Dehradun taxi coordinator will call <span className="text-white font-semibold">+91 {customerPhone}</span> to confirm pickup details and driver phone.
                 </p>
               </div>
               <div className="p-4 rounded-2xl text-left space-y-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>

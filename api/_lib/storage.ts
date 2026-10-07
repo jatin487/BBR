@@ -66,13 +66,29 @@ export type BackendKycRecord = {
   verifiedAt?: string;
 };
 
+export type StoredEnquiry = {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  category?: string;
+  pickupHub?: string;
+  travelDate?: string;
+  message?: string;
+  marketingConsent?: boolean;
+  termsAccepted?: boolean;
+  createdAt: string;
+  status: 'new' | 'contacted' | 'resolved';
+};
+
 export type StoredData = {
   users: StoredUser[];
   bookings: StoredBooking[];
+  enquiries?: StoredEnquiry[];
   kycRecords?: Record<string, BackendKycRecord>;
 };
 
-let inMemoryData: StoredData = { users: [], bookings: [], kycRecords: {} };
+let inMemoryData: StoredData = { users: [], bookings: [], enquiries: [], kycRecords: {} };
 
 const readData = (): StoredData => {
   // 1. Try file-based storage first (/tmp on Lambda/Vercel or local root in dev)
@@ -84,6 +100,7 @@ const readData = (): StoredData => {
         inMemoryData = {
           users: Array.isArray(parsed.users) ? parsed.users : inMemoryData.users,
           bookings: Array.isArray(parsed.bookings) ? parsed.bookings : inMemoryData.bookings,
+          enquiries: Array.isArray(parsed.enquiries) ? parsed.enquiries : inMemoryData.enquiries || [],
           kycRecords: parsed.kycRecords || inMemoryData.kycRecords || {},
         };
         return inMemoryData;
@@ -192,6 +209,15 @@ export const saveBooking = (booking: StoredBooking): StoredBooking => {
   writeData(next);
   return booking;
 };
+
+export const saveEnquiry = (enquiry: StoredEnquiry): StoredEnquiry => {
+  const data = readData();
+  const next = { ...data, enquiries: [...(data.enquiries || []), enquiry] };
+  writeData(next);
+  return enquiry;
+};
+
+export const getEnquiries = (): StoredEnquiry[] => readData().enquiries || [];
 
 export const updateBooking = (id: string, updates: Partial<StoredBooking>): StoredBooking | null => {
   const data = readData();

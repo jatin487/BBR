@@ -18,12 +18,14 @@ interface FooterProps {
   onNavigate: (tab: string) => void;
   onOpenPriceList: () => void;
   onSelectCity: (city: string) => void;
+  onOpenCookieSettings?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   onNavigate,
   onOpenPriceList,
-  onSelectCity
+  onSelectCity,
+  onOpenCookieSettings
 }) => {
   return (
     <footer style={{ backgroundColor: '#0A0A0A', borderTop: '1px solid #2A2A2A' }} className="text-[#9BA1A5] pt-16 pb-12">
@@ -194,7 +196,7 @@ export const Footer: React.FC<FooterProps> = ({
             </ul>
           </div>
 
-          {/* Col 4: Quick Navigation & Legal */}
+          {/* Col 4: Customer Help */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-white">
               Customer Help
@@ -216,8 +218,8 @@ export const Footer: React.FC<FooterProps> = ({
                 </button>
               </li>
               <li>
-                <button onClick={() => onNavigate('home')} className="hover:text-white transition-colors">
-                  Security Deposit Policy
+                <button onClick={() => onNavigate('contact')} className="hover:text-white transition-colors">
+                  Send Rental Enquiry
                 </button>
               </li>
               <li>
@@ -232,17 +234,80 @@ export const Footer: React.FC<FooterProps> = ({
               </li>
             </ul>
           </div>
+
+          {/* Col 5: Legal & Policies */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+              Legal & Privacy
+            </h4>
+            <ul className="space-y-2 text-xs">
+              <li>
+                <button
+                  onClick={() => onNavigate('privacy')}
+                  className="hover:text-white transition-colors text-left"
+                  style={{ color: '#9BA1A5' }}
+                >
+                  Privacy Policy
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => onNavigate('terms')}
+                  className="hover:text-white transition-colors text-left"
+                  style={{ color: '#9BA1A5' }}
+                >
+                  Terms of Service
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => onNavigate('refund')}
+                  className="hover:text-white transition-colors text-left"
+                  style={{ color: '#9BA1A5' }}
+                >
+                  Refund & Cancellation Policy
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => onNavigate('cookies')}
+                  className="hover:text-white transition-colors text-left"
+                  style={{ color: '#9BA1A5' }}
+                >
+                  Cookie Policy
+                </button>
+              </li>
+              {onOpenCookieSettings && (
+                <li>
+                  <button
+                    onClick={onOpenCookieSettings}
+                    className="hover:text-orange-400 transition-colors text-left font-semibold"
+                    style={{ color: '#FF6A00' }}
+                  >
+                    🍪 Cookie Preferences
+                  </button>
+                </li>
+              )}
+            </ul>
+          </div>
         </div>
-      <GoogleReview />
-        {/* Bottom Copyright & Disclaimer */}
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs" style={{ color: '#656C70' }}>
-          <div>
-            © {new Date().getFullYear()} Bharat Bike And Car Rentals (BBR). Bhauwala, Dehradun, Uttarakhand 248007.
+
+        <GoogleReview />
+
+        {/* Bottom Copyright, Legal Review Notice & Disclaimer */}
+        <div className="pt-8 border-t border-white/5 space-y-3 text-xs" style={{ color: '#656C70' }}>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              © {new Date().getFullYear()} Bharat Bike And Car Rentals (BBR). Bhauwala, Dehradun, Uttarakhand 248007.
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <span>Crafted for Uttarakhand Travelers</span>
+              <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <span>Crafted for Uttarakhand Travelers</span>
-            <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
-          </div>
+          <p className="text-[11px] text-slate-500 text-center sm:text-left leading-relaxed">
+            Legal notice: Policies published on this portal are operational review drafts prepared for compliance under Indian law (DPDP Act 2023, IT Act 2000, Motor Vehicles Act 1988, and Consumer Protection Act 2019). Placeholders are marked for merchant finalization.
+          </p>
         </div>
       </div>
     </footer>
